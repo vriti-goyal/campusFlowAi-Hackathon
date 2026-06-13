@@ -1,6 +1,10 @@
 // src/App.jsx
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import { ToastProvider } from '@/contexts/ToastContext';
+import ToastContainer from '@/components/Toast';
+import Spinner from '@/components/Spinner';
 
 // Layout
 import AppLayout from './components/layout/AppLayout';
@@ -21,14 +25,18 @@ import ProfilePage from './pages/Profile';
 /** Redirect unauthenticated users to /login */
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="flex items-center justify-center h-screen text-muted-foreground">Loading…</div>;
+  if (loading) return <Spinner />;
   return user ? children : <Navigate to="/login" replace />;
 }
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
+    <ErrorBoundary>
+      <ToastProvider>
+        <AuthProvider>
+          <ToastContainer />
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
 
       {/* All authenticated routes share the sidebar layout */}
       <Route
@@ -52,8 +60,11 @@ export default function App() {
         <Route path="profile"     element={<ProfilePage />} />
       </Route>
 
-      {/* Catch-all */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+        {/* Catch-all */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+        </AuthProvider>
+      </ToastProvider>
+    </ErrorBoundary>
   );
 }

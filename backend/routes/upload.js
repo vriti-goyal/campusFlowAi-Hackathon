@@ -39,7 +39,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
     // Create Post document
     const post = await Post.create({
       batchId,
-      uploadedBy: req.user.uid,
+      uploadedBy: req.user._id,
       type: extraction.extractedType || 'general',
       title: extraction.title,
       originalText: '',
@@ -76,7 +76,7 @@ router.post('/text', verifyFirebaseToken, async (req, res) => {
     // Create Post document
     const post = await Post.create({
       batchId,
-      uploadedBy: req.user.uid,
+      uploadedBy: req.user._id,
       type: extraction.extractedType || 'general',
       title: extraction.title,
       originalText: text,

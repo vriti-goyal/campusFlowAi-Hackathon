@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const postSchema = new mongoose.Schema(
   {
     batchId: { type: String, required: true },
-    uploadedBy: { type: String, required: true }, // Firebase UID or ObjectId
+    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Firebase UID or ObjectId
     type: { type: String, default: 'general' },
     title: { type: String, default: '' },
     originalText: { type: String, default: '' },

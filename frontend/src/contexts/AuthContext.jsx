@@ -2,7 +2,8 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase';
-import { setAuthToken } from '@/lib/api';
+import { setAuthToken, setupInterceptors } from '@/lib/api';
+import { useToast } from '@/contexts/ToastContext';
 
 const AuthContext = createContext(null);
 
@@ -10,6 +11,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);        // Firebase user object
   const [idToken, setIdToken] = useState(null);  // Raw ID token string
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -18,6 +20,7 @@ export function AuthProvider({ children }) {
         setUser(firebaseUser);
         setIdToken(token);
         setAuthToken(token);
+        setupInterceptors(toast);
       } else {
         setUser(null);
         setIdToken(null);

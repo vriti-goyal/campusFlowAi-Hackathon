@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { LayoutDashboard, AlertCircle, CalendarDays, Bot, Users, Sparkles, Loader2, Target, CheckCircle, Bell, ArrowRight } from 'lucide-react';
+import { LayoutDashboard, AlertCircle, CalendarDays, Bot, Users, Sparkles, Loader2, Target, CheckCircle, Bell, ArrowRight, ClipboardList, BookOpen, Briefcase } from 'lucide-react';
 import api from '@/lib/api';
 import { Link } from 'react-router-dom';
 
@@ -78,18 +78,11 @@ export default function DashboardPage() {
       {digest && (
         <div className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-200 dark:border-indigo-900 rounded-xl p-6">
           <h3 className="text-lg font-bold text-indigo-700 dark:text-indigo-400 flex items-center gap-2 mb-3">
-            <Sparkles size={20} /> {digest.greeting}
+            <Sparkles size={20} /> Daily Digest
           </h3>
-          <ul className="space-y-2 mb-4">
-            {digest.summaryLines?.map((line, i) => (
-              <li key={i} className="text-foreground text-sm flex items-start gap-2">
-                <span className="text-indigo-500 mt-0.5">•</span> {line}
-              </li>
-            ))}
-          </ul>
-          <div className="bg-indigo-500/20 text-indigo-800 dark:text-indigo-200 px-4 py-3 rounded-lg text-sm font-medium flex items-center gap-2">
-            <Target size={16} /> Recommended Action: {digest.recommendedAction}
-          </div>
+          <p className="text-foreground text-sm whitespace-pre-wrap">
+            {digest.digestText}
+          </p>
         </div>
       )}
 

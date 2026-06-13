@@ -56,7 +56,7 @@ router.post('/', verifyFirebaseToken, async (req, res) => {
 
     // Create calendar event
     const calEvent = await CalendarEvent.create({
-      userId: req.user.uid,
+      userId: req.user._id,
       batchId,
       title: `Exam: ${subject}`,
       category: 'exam',

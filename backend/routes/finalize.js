@@ -42,6 +42,7 @@ router.post('/finalize', verifyFirebaseToken, async (req, res) => {
         verified: true,
       });
       entry = await Assignment.create({
+        userId: req.user._id,
         batchId: post.batchId,
         postId: post._id,
         title: extraction.title,
@@ -56,7 +57,7 @@ router.post('/finalize', verifyFirebaseToken, async (req, res) => {
 
       if (extraction.deadline) {
         await CalendarEvent.create({
-          userId: req.user.uid,
+          userId: req.user._id,
           batchId: post.batchId,
           title: `Assignment: ${extraction.title}`,
           category: 'assignment',
@@ -68,6 +69,7 @@ router.post('/finalize', verifyFirebaseToken, async (req, res) => {
       }
     } else if (category === 'exam') {
       entry = await Exam.create({
+        userId: req.user._id,
         batchId: post.batchId,
         postId: post._id,
         subject: extraction.title || extraction.subject || 'Untitled Exam',
@@ -78,7 +80,7 @@ router.post('/finalize', verifyFirebaseToken, async (req, res) => {
       });
 
       await CalendarEvent.create({
-        userId: req.user.uid,
+        userId: req.user._id,
         batchId: post.batchId,
         title: `Exam: ${entry.subject}`,
         category: 'exam',
@@ -112,7 +114,7 @@ router.post('/finalize', verifyFirebaseToken, async (req, res) => {
 
       if (extraction.deadline) {
         await CalendarEvent.create({
-          userId: req.user.uid,
+          userId: req.user._id,
           batchId: post.batchId,
           title: `Placement: ${entry.company} - ${entry.role || 'Apply'}`,
           category: 'placement',

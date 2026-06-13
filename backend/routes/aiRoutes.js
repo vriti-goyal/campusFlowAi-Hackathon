@@ -1,7 +1,6 @@
 import express from 'express';
 import { verifyFirebaseToken } from '../middleware/auth.js';
 import { AIChatHistory } from '../models/AIChatHistory.js';
-import { User } from '../models/User.js';
 import { Assignment } from '../models/Assignment.js';
 import { Exam } from '../models/Exam.js';
 import { Placement } from '../models/Placement.js';
@@ -20,7 +19,7 @@ router.use(verifyFirebaseToken);
  * Gather user's academic context for AI prompts.
  * Keeps data compact (max 5 items per category) for token efficiency.
  */
-async function gatherUserContext(firebaseUid) {
+async function gatherUserContext(user) {
   const now = new Date();
   const in5Days = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
   const in48Hours = new Date(now.getTime() + 48 * 60 * 60 * 1000);
@@ -29,7 +28,6 @@ async function gatherUserContext(firebaseUid) {
   endOfTomorrow.setHours(23, 59, 59, 999);
 
   // User profile
-  const user = await User.findOne({ firebaseUid }).lean();
   const profile = user
     ? { name: user.name, branch: user.branch, cgpa: user.cgpa, semester: user.semester, backlogs: user.backlogs || 0 }
     : { name: 'Student', branch: '', cgpa: 0, semester: 0, backlogs: 0 };
@@ -67,8 +65,8 @@ async function gatherUserContext(firebaseUid) {
 
   // Placements (active, eligible-ish, not applied, max 5)
   const appliedStatuses = await StudentPlacementStatus.find({
-    studentId: firebaseUid,
-    applicationStatus: 'Applied',
+    userId: user._id,
+    status: 'Applied',
   }).lean();
   const appliedIds = new Set(appliedStatuses.map((s) => s.placementId.toString()));
 
@@ -90,7 +88,7 @@ async function gatherUserContext(firebaseUid) {
 
   // Today & tomorrow calendar events (max 5)
   const events = await CalendarEvent.find({
-    userId: firebaseUid,
+    userId: user._id,
     date: { $gte: now, $lte: endOfTomorrow },
     status: 'upcoming',
   })
@@ -131,12 +129,11 @@ async function gatherUserContext(firebaseUid) {
 /**
  * Build digest-specific counts context.
  */
-async function gatherDigestContext(firebaseUid) {
+async function gatherDigestContext(user) {
   const now = new Date();
   const in5Days = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
   const in48Hours = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 
-  const user = await User.findOne({ firebaseUid }).lean();
   const name = user?.name || 'Student';
 
   const pendingAssignments = await Assignment.countDocuments({
@@ -220,7 +217,7 @@ router.post('/ask', async (req, res) => {
     if (!question) return res.status(400).json({ error: 'Question is required' });
 
     // Gather user context
-    const context = await gatherUserContext(req.user.uid);
+    const context = await gatherUserContext(req.user);
 
     // Build prompt with injection safety (delimiters around user input)
     const prompt = buildAssistantPrompt(question, context);
@@ -243,13 +240,9 @@ router.post('/ask', async (req, res) => {
         .filter((s) => s.length > 0);
     }
 
-    // Find or create user in DB for chat history
-    const user = await User.findOne({ firebaseUid: req.user.uid });
-    const userId = user?._id || req.user.uid;
-
     // Store in chat history
     const chat = await AIChatHistory.create({
-      userId,
+      userId: req.user._id,
       question,
       answer,
       sources,
@@ -268,10 +261,7 @@ router.post('/ask', async (req, res) => {
  */
 router.get('/history', async (req, res) => {
   try {
-    const user = await User.findOne({ firebaseUid: req.user.uid });
-    if (!user) return res.json([]);
-
-    const history = await AIChatHistory.find({ userId: user._id })
+    const history = await AIChatHistory.find({ userId: req.user._id })
       .sort({ createdAt: -1 })
       .limit(20);
     res.json(history.reverse()); // oldest first for chat UI
@@ -287,7 +277,7 @@ router.get('/history', async (req, res) => {
  */
 router.post('/daily-digest', async (req, res) => {
   try {
-    const context = await gatherDigestContext(req.user.uid);
+    const context = await gatherDigestContext(req.user);
 
     const prompt = buildDigestPrompt(context);
     const digestText = await invokeTitan(prompt, 200);

@@ -3,7 +3,6 @@ import { verifyFirebaseToken } from '../middleware/auth.js';
 import { Placement } from '../models/Placement.js';
 import { StudentPlacementStatus } from '../models/StudentPlacementStatus.js';
 import { CalendarEvent } from '../models/CalendarEvent.js';
-import { User } from '../models/User.js';
 import { calculatePriorityScore } from '../services/priorityScore.js';
 import { ok, fail } from '../utils/response.js';
 
@@ -23,12 +22,11 @@ router.get('/', verifyFirebaseToken, async (req, res) => {
     const placements = await Placement.find(filter).sort({ deadline: 1 });
 
     // Get user's profile for eligibility check
-    const user = await User.findOne({ uid: req.user.uid });
-    const userCgpa = user?.cgpa || 0;
-    const userBranch = user?.branch || '';
+    const userCgpa = req.user.cgpa || 0;
+    const userBranch = req.user.branch || '';
 
     // Get existing application statuses
-    const statuses = await StudentPlacementStatus.find({ studentId: req.user.uid });
+    const statuses = await StudentPlacementStatus.find({ userId: req.user._id });
     const statusMap = {};
     statuses.forEach((s) => {
       statusMap[s.placementId.toString()] = s;
@@ -44,7 +42,7 @@ router.get('/', verifyFirebaseToken, async (req, res) => {
       const eligible = meetsGpa && meetsBranch;
 
       pObj.eligibilityStatus = eligible ? 'eligible' : 'not_eligible';
-      pObj.applicationStatus = existing?.applicationStatus || 'Not Applied';
+      pObj.applicationStatus = existing?.status || 'Not Applied';
       pObj.appliedAt = existing?.appliedAt || null;
 
       return pObj;
@@ -88,7 +86,7 @@ router.post('/', verifyFirebaseToken, async (req, res) => {
     // Calendar event for deadline
     if (deadline) {
       await CalendarEvent.create({
-        userId: req.user.uid,
+        userId: req.user._id,
         batchId,
         title: `Placement: ${company} - ${role || 'Apply'}`,
         category: 'placement',
@@ -116,11 +114,11 @@ router.post('/:id/apply', verifyFirebaseToken, async (req, res) => {
     if (!placement) return fail(res, 'Placement not found', 404);
 
     const status = await StudentPlacementStatus.findOneAndUpdate(
-      { studentId: req.user.uid, placementId },
+      { userId: req.user._id, placementId },
       {
-        studentId: req.user.uid,
+        userId: req.user._id,
         placementId,
-        applicationStatus: 'Applied',
+        status: 'Applied',
         appliedAt: new Date(),
       },
       { upsert: true, new: true }
