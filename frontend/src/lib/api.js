@@ -5,7 +5,7 @@ import { auth } from '@/lib/firebase';
 let interceptorsInitialized = false;
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000',
+  baseURL: import.meta.env.VITE_API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 });
 
