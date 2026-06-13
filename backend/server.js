@@ -22,7 +22,10 @@ const PORT = process.env.PORT || 8080;
 
 // ── Middleware ──────────────────────────────────────────────
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
+  origin: function (origin, callback) {
+    // dynamically allow any origin for local testing, fallback to FRONTEND_URL in prod
+    callback(null, origin || process.env.FRONTEND_URL || '*');
+  },
   credentials: true
 }));
 app.use(morgan('dev'));
