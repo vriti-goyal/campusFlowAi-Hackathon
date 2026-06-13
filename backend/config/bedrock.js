@@ -1,42 +1,68 @@
-import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
+import { BedrockRuntimeClient, InvokeModelCommand, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 
-let bedrockClient = null;
+const region = process.env.AWS_REGION || 'us-east-1';
 
-try {
-  // Try to initialize the client. This will use credentials from env vars if available.
-  bedrockClient = new BedrockRuntimeClient({ region: process.env.AWS_REGION || 'us-east-1' });
-} catch (error) {
-  console.warn("Failed to initialize Bedrock Runtime Client. Ensure AWS credentials are set if using AI features.");
+const bedrockClient = new BedrockRuntimeClient({
+  region,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
+
+// ── Rate limiter: max 1 call per 3 seconds ──────────────────
+let lastCallTime = 0;
+const MIN_INTERVAL_MS = 3000;
+
+async function rateLimitGuard() {
+  const now = Date.now();
+  const elapsed = now - lastCallTime;
+  if (elapsed < MIN_INTERVAL_MS) {
+    const waitMs = MIN_INTERVAL_MS - elapsed;
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+  }
+  lastCallTime = Date.now();
 }
 
-export const invokeTitan = async (prompt) => {
-  if (!bedrockClient) {
-    console.warn("Bedrock client not initialized. Returning STUB response.");
-    return `[STUB - Bedrock not configured] I would have answered your question: "${prompt}"`;
-  }
+/**
+ * Invoke a Bedrock model using the Converse API (works with all model types
+ * including inference profiles like us.amazon.nova-*, us.anthropic.claude-*, etc.)
+ *
+ * @param {string} prompt - The prompt text
+ * @param {number} maxTokens - Max tokens for response (default 512)
+ * @returns {Promise<string>} Model output text
+ */
+export async function invokeModel(prompt, maxTokens = 512) {
+  await rateLimitGuard();
 
-  try {
-    const command = new InvokeModelCommand({
-      modelId: "amazon.titan-text-lite-v1",
-      contentType: "application/json",
-      accept: "application/json",
-      body: JSON.stringify({
-        inputText: prompt,
-        textGenerationConfig: {
-          maxTokenCount: 512,
-          stopSequences: [],
-          temperature: 0.7,
-          topP: 0.9
-        }
-      })
-    });
+  const modelId = process.env.BEDROCK_MODEL_ID || 'us.amazon.nova-lite-v1:0';
 
-    const response = await bedrockClient.send(command);
-    // Parse the response body (it's a Uint8Array)
-    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-    return responseBody.results[0].outputText;
-  } catch (error) {
-    console.error("Error invoking Bedrock:", error);
-    return `[ERROR - Fallback STUB] Could not reach AWS Bedrock. You asked: "${prompt}"`;
-  }
-};
+  const command = new ConverseCommand({
+    modelId,
+    messages: [
+      {
+        role: 'user',
+        content: [{ text: prompt }],
+      },
+    ],
+    inferenceConfig: {
+      maxTokens,
+      temperature: 0.2,
+      topP: 0.9,
+    },
+  });
+
+  const response = await bedrockClient.send(command);
+
+  console.log('[Bedrock] Stop reason:', response.stopReason);
+  console.log('[Bedrock] Usage:', JSON.stringify(response.usage));
+
+  // Converse API returns output.message.content[0].text
+  const outputText = response.output?.message?.content?.[0]?.text || '';
+  console.log('[Bedrock] Output text (first 200 chars):', outputText.slice(0, 200));
+
+  return outputText;
+}
+
+// Backward-compatible alias
+export const invokeTitan = invokeModel;

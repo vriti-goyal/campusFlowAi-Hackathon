@@ -4,9 +4,15 @@ const assignmentSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Batch' },
+    postId: { type: mongoose.Schema.Types.ObjectId, ref: 'Post', default: null },
     title: { type: String, required: true },
-    deadline: { type: Date, required: true },
-    status: { type: String, enum: ['Pending', 'Submitted', 'Late'], default: 'Pending' }
+    subject: { type: String, default: '' },
+    deadline: { type: Date, default: null },
+    submissionMode: { type: String, enum: ['online', 'offline', 'both'], default: 'online' },
+    priorityScore: { type: Number, default: 0 },
+    priorityLevel: { type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'medium' },
+    status: { type: String, enum: ['Not Started', 'In Progress', 'Submitted', 'Missed', 'Pending', 'Late'], default: 'Not Started' },
+    actionRequired: { type: String, default: '' },
   },
   { timestamps: true }
 );
