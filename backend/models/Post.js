@@ -2,14 +2,14 @@ import mongoose from 'mongoose';
 
 const postSchema = new mongoose.Schema(
   {
-    batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Batch', required: true },
-    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    batchId: { type: String, required: true },
+    uploadedBy: { type: String, required: true }, // Firebase UID or ObjectId
     type: { type: String, default: 'general' },
     title: { type: String, default: '' },
     originalText: { type: String, default: '' },
     fileUrl: { type: String, default: '' },
     summary: { type: String, default: '' },
-    actionRequired: { type: Boolean, default: false },
+    actionRequired: { type: String, default: '' },
     category: { type: String, default: 'general' },
     priorityScore: { type: Number, default: 0 },
     priorityLevel: { type: String, enum: ['low', 'medium', 'high', 'critical', 'urgent'], default: 'medium' },
