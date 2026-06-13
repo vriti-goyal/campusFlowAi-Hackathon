@@ -104,7 +104,7 @@ export default function DashboardPage() {
               <div key={i} className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                   <span className="text-xs font-bold uppercase tracking-wider text-red-600 dark:text-red-400 mb-1 block">
-                    {alert.type} DUE < 24h
+                    {alert.type} DUE &lt; 24h
                   </span>
                   <p className="font-semibold text-foreground">{alert.title}</p>
                 </div>
