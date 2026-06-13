@@ -1,0 +1,22 @@
+import mongoose from 'mongoose';
+
+const placementSchema = new mongoose.Schema(
+  {
+    batchId: { type: String, required: true },
+    postId: { type: mongoose.Schema.Types.ObjectId, ref: 'Post', default: null },
+    company: { type: String, required: true },
+    role: { type: String, default: '' },
+    package: { type: String, default: '' },
+    eligibleBranches: [{ type: String }],
+    minimumCgpa: { type: Number, default: 0 },
+    allowedBacklogs: { type: Number, default: 0 },
+    deadline: { type: Date, default: null },
+    testDate: { type: Date, default: null },
+    applicationLink: { type: String, default: '' },
+    priorityScore: { type: Number, default: 0 },
+    status: { type: String, enum: ['upcoming', 'active', 'closed'], default: 'active' },
+  },
+  { timestamps: true }
+);
+
+export const Placement = mongoose.model('Placement', placementSchema);
