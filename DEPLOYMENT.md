@@ -36,6 +36,7 @@ This guide provides step-by-step instructions for deploying the CampusFlow AI pl
 - `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`: Firebase Admin credentials.
 - `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`: AWS credentials for S3/Bedrock/Textract.
 - `S3_BUCKET_NAME`: Name of the S3 bucket for uploads.
+- `BEDROCK_MODEL_ID`: AWS Bedrock model ID (e.g. `amazon.nova-micro-v1:0`).
 
 ---
 

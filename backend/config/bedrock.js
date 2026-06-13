@@ -35,7 +35,7 @@ async function rateLimitGuard() {
 export async function invokeModel(prompt, maxTokens = 512) {
   await rateLimitGuard();
 
-  const modelId = process.env.BEDROCK_MODEL_ID || 'us.amazon.nova-lite-v1:0';
+  const modelId = process.env.BEDROCK_MODEL_ID || 'amazon.nova-micro-v1:0';
 
   const command = new ConverseCommand({
     modelId,

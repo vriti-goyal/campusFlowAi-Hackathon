@@ -51,7 +51,7 @@ Copy `.env.example` → `backend/.env` and fill in:
 | `AWS_SECRET_ACCESS_KEY` | AWS IAM secret |
 | `AWS_REGION` | AWS region (e.g. `us-east-1`) |
 | `S3_BUCKET_NAME` | S3 bucket for file uploads |
-| `BEDROCK_MODEL_ID` | AWS Bedrock model ID (Claude) |
+| `BEDROCK_MODEL_ID` | AWS Bedrock model ID (Nova) |
 | `FIREBASE_PROJECT_ID` | Firebase project ID |
 | `JWT_SECRET` | Secret for any custom JWT signing |
 | `PORT` | API server port (default `5000`) |
@@ -126,4 +126,4 @@ App available at **http://localhost:5173**
 | Backend | Express 4, Node.js (ESM), Morgan, CORS |
 | Database | MongoDB via Mongoose |
 | Storage | AWS S3 |
-| AI | AWS Bedrock (Claude) |
+| AI | AWS Bedrock (Nova) |
