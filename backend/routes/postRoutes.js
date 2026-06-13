@@ -33,7 +33,10 @@ router.get('/:batchId', checkBatchMembership, async (req, res) => {
       ];
     }
 
-    const posts = await Post.find(query).populate('uploadedBy', 'name email').sort({ isPinned: -1, createdAt: -1 });
+    const posts = await Post.find(query)
+      .populate('uploadedBy', 'name email role')
+      .populate('verifiedBy', 'name email role')
+      .sort({ isPinned: -1, createdAt: -1 });
     res.json(posts);
   } catch (error) {
     console.error(error);

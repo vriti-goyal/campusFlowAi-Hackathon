@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Pin, CheckCircle, Trash2, Loader2, Send } from 'lucide-react';
+import { Users, Pin, CheckCircle, Trash2, Loader2, Send, AlertCircle, ChevronDown, ChevronUp, ShieldCheck, FileWarning } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -15,6 +15,12 @@ export default function CommunityPage() {
   
   const [newPost, setNewPost] = useState({ title: '', originalText: '', type: 'general' });
   const [posting, setPosting] = useState(false);
+
+  const [expandedPosts, setExpandedPosts] = useState({});
+  const toggleExpand = (id) => setExpandedPosts(prev => ({...prev, [id]: !prev[id]}));
+
+  const [expandedDuplicates, setExpandedDuplicates] = useState({});
+  const toggleDuplicate = (id) => setExpandedDuplicates(prev => ({...prev, [id]: !prev[id]}));
 
   useEffect(() => {
     const init = async () => {
@@ -183,55 +189,146 @@ export default function CommunityPage() {
         {posts.length === 0 ? (
           <p className="text-muted-foreground text-center py-10">No posts found in this category.</p>
         ) : (
-          posts.map(post => (
-            <div key={post._id} className={`bg-card border ${post.isPinned ? 'border-primary/50 ring-1 ring-primary/20' : 'border-border'} rounded-xl p-5 shadow-sm`}>
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-medium px-2 py-0.5 rounded bg-secondary text-secondary-foreground capitalize">
-                      {post.type}
-                    </span>
-                    {post.verificationStatus === 'verified' && (
-                      <span className="flex items-center gap-1 text-[10px] font-bold text-green-600 bg-green-100 dark:bg-green-900/30 dark:text-green-400 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                        <CheckCircle size={10} /> Verified
+          posts.map(post => {
+            const isDuplicateCollapsed = post.isDuplicate && !expandedDuplicates[post._id];
+            
+            // Verification Badge Logic
+            let badgeText = "Unverified Student Upload";
+            let badgeIcon = <AlertCircle size={10} />;
+            let badgeColor = "text-gray-500 bg-gray-100 dark:bg-gray-800 dark:text-gray-400";
+            
+            if (post.verificationStatus === 'verified') {
+              if (post.verifiedBy?.role === 'admin') {
+                badgeText = "Official College Notice";
+                badgeIcon = <ShieldCheck size={10} />;
+                badgeColor = "text-blue-600 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400";
+              } else if (post.verifiedBy?.role === 'cr') {
+                badgeText = "Verified by CR";
+                badgeIcon = <CheckCircle size={10} />;
+                badgeColor = "text-purple-600 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-400";
+              } else {
+                badgeText = "Verified by Moderator";
+                badgeIcon = <CheckCircle size={10} />;
+                badgeColor = "text-green-600 bg-green-100 dark:bg-green-900/30 dark:text-green-400";
+              }
+            }
+
+            // Priority Badge Logic
+            let priorityColor = "bg-gray-100 text-gray-700";
+            if (post.priorityLevel === 'high' || post.priorityLevel === 'urgent') priorityColor = "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
+            else if (post.priorityLevel === 'medium') priorityColor = "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
+            else if (post.priorityLevel === 'low') priorityColor = "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+
+            return (
+              <div key={post._id} className={`bg-card border ${post.isPinned ? 'border-primary/50 ring-1 ring-primary/20' : 'border-border'} rounded-xl p-5 shadow-sm transition-all`}>
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="text-xs font-medium px-2 py-0.5 rounded bg-secondary text-secondary-foreground capitalize">
+                        {post.type}
                       </span>
-                    )}
-                    {post.isPinned && (
-                      <span className="flex items-center gap-1 text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                        <Pin size={10} /> Pinned
+                      
+                      <span className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${badgeColor}`}>
+                        {badgeIcon} {badgeText}
                       </span>
-                    )}
-                  </div>
-                  <h3 className="text-lg font-bold text-foreground">{post.title}</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {post.uploadedBy?.name || 'Unknown'} • {new Date(post.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-                
-                {/* Actions */}
-                <div className="flex gap-2">
-                  {isMod && (
-                    <>
-                      <button onClick={() => handlePin(post._id)} className={`p-1.5 rounded-md hover:bg-secondary ${post.isPinned ? 'text-primary' : 'text-muted-foreground'}`} title="Pin">
-                        <Pin size={16} />
-                      </button>
-                      {post.verificationStatus !== 'verified' && (
-                        <button onClick={() => handleVerify(post._id)} className="p-1.5 rounded-md hover:bg-green-100 text-muted-foreground hover:text-green-600" title="Verify">
-                          <CheckCircle size={16} />
+                      
+                      {post.isPinned && (
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                          <Pin size={10} /> Pinned
+                        </span>
+                      )}
+
+                      {post.priorityLevel && post.priorityLevel !== 'low' && (
+                        <span className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${priorityColor}`}>
+                          {post.priorityLevel} Priority
+                        </span>
+                      )}
+
+                      {post.isDuplicate && (
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                          <FileWarning size={10} /> Duplicate — merged
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center gap-2 mt-2">
+                      <h3 className={`text-lg font-bold ${isDuplicateCollapsed ? 'text-muted-foreground' : 'text-foreground'}`}>
+                        {post.title}
+                      </h3>
+                      {post.isDuplicate && (
+                        <button onClick={() => toggleDuplicate(post._id)} className="text-xs text-primary hover:underline">
+                          {isDuplicateCollapsed ? 'Show' : 'Hide'}
                         </button>
                       )}
-                    </>
-                  )}
-                  {(isMod || post.uploadedBy?._id === user?.uid) && ( // Simple fallback for uploader check
-                    <button onClick={() => handleDelete(post._id)} className="p-1.5 rounded-md hover:bg-red-100 text-muted-foreground hover:text-red-500" title="Delete">
-                      <Trash2 size={16} />
-                    </button>
-                  )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {post.uploadedBy?.name || 'Unknown'} • {new Date(post.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    {isMod && (
+                      <>
+                        <button onClick={() => handlePin(post._id)} className={`p-1.5 rounded-md hover:bg-secondary ${post.isPinned ? 'text-primary' : 'text-muted-foreground'}`} title="Pin">
+                          <Pin size={16} />
+                        </button>
+                        {post.verificationStatus !== 'verified' && (
+                          <button onClick={() => handleVerify(post._id)} className="p-1.5 rounded-md hover:bg-green-100 text-muted-foreground hover:text-green-600" title="Verify">
+                            <CheckCircle size={16} />
+                          </button>
+                        )}
+                      </>
+                    )}
+                    {(isMod || post.uploadedBy?._id === user?.uid) && (
+                      <button onClick={() => handleDelete(post._id)} className="p-1.5 rounded-md hover:bg-red-100 text-muted-foreground hover:text-red-500" title="Delete">
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {!isDuplicateCollapsed && (
+                  <div className="space-y-3 mt-4">
+                    {post.actionRequired && (
+                      <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-3 rounded-r-md">
+                        <p className="text-sm font-semibold text-red-800 dark:text-red-300 flex items-center gap-2">
+                          <AlertCircle size={16} /> Action Required
+                        </p>
+                      </div>
+                    )}
+                    
+                    {post.summary ? (
+                      <div>
+                        <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                          <p className="font-semibold text-muted-foreground mb-1 text-xs uppercase tracking-wider">AI Summary</p>
+                          {post.summary}
+                        </div>
+                        
+                        <div className="mt-3 pt-3 border-t border-border">
+                          <button 
+                            onClick={() => toggleExpand(post._id)}
+                            className="flex items-center gap-1 text-xs text-primary hover:underline font-medium"
+                          >
+                            {expandedPosts[post._id] ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                            {expandedPosts[post._id] ? 'Hide full text' : 'Show full text'}
+                          </button>
+                          
+                          {expandedPosts[post._id] && (
+                            <div className="mt-3 text-sm text-muted-foreground whitespace-pre-wrap bg-secondary/30 p-3 rounded-md">
+                              {post.originalText}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-foreground whitespace-pre-wrap">{post.originalText}</p>
+                    )}
+                  </div>
+                )}
               </div>
-              <p className="text-sm text-foreground whitespace-pre-wrap">{post.originalText}</p>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

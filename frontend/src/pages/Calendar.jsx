@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { CalendarDays, Plus, Loader2, Trash2 } from 'lucide-react';
+import { CalendarDays, Plus, Loader2, Trash2, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import api from '@/lib/api';
 
 const CATEGORIES = ['Assignment', 'Exam', 'Placement', 'Event', 'Hostel', 'Transport', 'Personal'];
@@ -121,12 +122,22 @@ export default function CalendarPage() {
                 <div className="space-y-2">
                   {groupedEvents[date].map(event => (
                     <div key={event._id} className="flex items-center justify-between bg-card border border-border rounded-lg p-3 hover:shadow-sm transition-shadow group">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 flex-1">
                         <span className="text-sm font-medium w-14 text-muted-foreground">{event.time || 'All Day'}</span>
                         <div className={`px-2 py-1 rounded text-xs font-semibold ${getCategoryColor(event.category)}`}>
                           {event.category}
                         </div>
-                        <span className="text-sm font-medium">{event.title}</span>
+                        {['assignment', 'exam', 'placement'].includes(event.sourceType?.toLowerCase()) && event.sourceId ? (
+                          <Link 
+                            to={`/${event.sourceType.toLowerCase()}s?highlight=${event.sourceId}`} 
+                            className="text-sm font-medium text-primary hover:underline flex items-center gap-1"
+                          >
+                            {event.title}
+                            <ExternalLink size={12} className="opacity-70" />
+                          </Link>
+                        ) : (
+                          <span className="text-sm font-medium">{event.title}</span>
+                        )}
                       </div>
                       
                       <button 
