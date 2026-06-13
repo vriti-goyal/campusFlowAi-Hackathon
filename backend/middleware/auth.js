@@ -1,4 +1,5 @@
 import admin from 'firebase-admin';
+import { User } from '../models/User.js';
 
 // Initialize Firebase Admin once
 if (!admin.apps.length) {
@@ -10,7 +11,7 @@ if (!admin.apps.length) {
 /**
  * Express middleware — verifies a Firebase ID token passed as
  *   Authorization: Bearer <idToken>
- * On success attaches decoded token to req.user.
+ * On success attaches MongoDB User to req.user.
  */
 export async function verifyFirebaseToken(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -23,7 +24,18 @@ export async function verifyFirebaseToken(req, res, next) {
 
   try {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
-    req.user = decodedToken; // { uid, email, name, ... }
+    
+    // Auto-create or fetch user from DB
+    let user = await User.findOne({ firebaseUid: decodedToken.uid });
+    if (!user) {
+      user = await User.create({
+        firebaseUid: decodedToken.uid,
+        email: decodedToken.email,
+        name: decodedToken.name || decodedToken.email.split('@')[0]
+      });
+    }
+    
+    req.user = user;
     next();
   } catch (err) {
     console.error('Firebase token verification failed:', err.message);

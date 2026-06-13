@@ -4,6 +4,10 @@ import cors from 'cors';
 import morgan from 'morgan';
 import { connectDB } from './config/db.js';
 import healthRouter from './routes/health.js';
+import userRoutes from './routes/userRoutes.js';
+import batchRoutes from './routes/batchRoutes.js';
+import postRoutes from './routes/postRoutes.js';
+import calendarRoutes from './routes/calendarRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -15,6 +19,10 @@ app.use(express.json());
 
 // ── Routes ──────────────────────────────────────────────────
 app.use('/', healthRouter);
+app.use('/api/users', userRoutes);
+app.use('/api/batch', batchRoutes);
+app.use('/api/posts', postRoutes);
+app.use('/api/calendar', calendarRoutes);
 
 // ── 404 catch-all ───────────────────────────────────────────
 app.use((req, res) => {
