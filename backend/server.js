@@ -9,6 +9,13 @@ import finalizeRouter from './routes/finalize.js';
 import assignmentsRouter from './routes/assignments.js';
 import examsRouter from './routes/exams.js';
 import placementsRouter from './routes/placements.js';
+import userRoutes from './routes/userRoutes.js';
+import batchRoutes from './routes/batchRoutes.js';
+import postRoutes from './routes/postRoutes.js';
+import calendarRoutes from './routes/calendarRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
+import aiRoutes from './routes/aiRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -25,6 +32,13 @@ app.use('/api/upload', finalizeRouter);
 app.use('/api/assignments', assignmentsRouter);
 app.use('/api/exams', examsRouter);
 app.use('/api/placements', placementsRouter);
+app.use('/api/users', userRoutes);
+app.use('/api/batch', batchRoutes);
+app.use('/api/posts', postRoutes);
+app.use('/api/calendar', calendarRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // ── 404 catch-all ───────────────────────────────────────────
 app.use((req, res) => {

@@ -2,7 +2,8 @@ import mongoose from 'mongoose';
 
 const assignmentSchema = new mongoose.Schema(
   {
-    batchId: { type: String, required: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Batch' },
     postId: { type: mongoose.Schema.Types.ObjectId, ref: 'Post', default: null },
     title: { type: String, required: true },
     subject: { type: String, default: '' },
@@ -10,7 +11,7 @@ const assignmentSchema = new mongoose.Schema(
     submissionMode: { type: String, enum: ['online', 'offline', 'both'], default: 'online' },
     priorityScore: { type: Number, default: 0 },
     priorityLevel: { type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'medium' },
-    status: { type: String, enum: ['Not Started', 'In Progress', 'Submitted', 'Missed'], default: 'Not Started' },
+    status: { type: String, enum: ['Not Started', 'In Progress', 'Submitted', 'Missed', 'Pending', 'Late'], default: 'Not Started' },
     actionRequired: { type: String, default: '' },
   },
   { timestamps: true }
