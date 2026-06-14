@@ -1,34 +1,21 @@
-import { useEffect, useState } from 'react';
-import { ClipboardList, Clock, AlertTriangle, CheckCircle2, Play, Bell, Loader2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ClipboardList, Clock, AlertTriangle, CheckCircle2, Play, Bell, Info } from 'lucide-react';
 import api from '@/lib/api';
-
-const STATUS_CONFIG = {
-  'Not Started': { color: 'bg-gray-100 text-gray-700', icon: Clock },
-  'In Progress': { color: 'bg-blue-100 text-blue-700', icon: Play },
-  Submitted: { color: 'bg-green-100 text-green-700', icon: CheckCircle2 },
-  Missed: { color: 'bg-red-100 text-red-700', icon: AlertTriangle },
-};
-
-const PRIORITY_COLORS = {
-  critical: 'text-red-600',
-  high: 'text-orange-600',
-  medium: 'text-yellow-600',
-  low: 'text-gray-500',
-};
+import { CFButton, CFCard, CFBadge, CFSkeleton, CFEmptyState } from '@/components/ui';
+import { cn } from '@/lib/utils';
 
 export default function AssignmentsPage() {
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(null);
+  const [activeTab, setActiveTab] = useState('Not Started');
 
   const fetchAssignments = async () => {
     try {
-      // Get user's batches, then fetch assignments for each
       const batchRes = await api.get('/api/batch/my-batches').catch(() => ({ data: [] }));
       const batches = batchRes.data || [];
 
       if (batches.length === 0) {
-        // No batches — fetch all assignments without batchId filter
         const res = await api.get('/api/assignments');
         setAssignments(res.data.data || []);
       } else {
@@ -43,7 +30,7 @@ export default function AssignmentsPage() {
         setAssignments(allAssignments);
       }
     } catch {
-      // Silently handle — show empty state
+      // Silently handle
     } finally {
       setLoading(false);
     }
@@ -65,106 +52,147 @@ export default function AssignmentsPage() {
     }
   };
 
-  const grouped = {
-    'Not Started': assignments.filter((a) => a.status === 'Not Started'),
-    'In Progress': assignments.filter((a) => a.status === 'In Progress'),
-    Submitted: assignments.filter((a) => a.status === 'Submitted'),
-    Missed: assignments.filter((a) => a.status === 'Missed'),
-  };
+  const tabs = ['Not Started', 'In Progress', 'Submitted', 'Missed'];
+  const filteredAssignments = assignments.filter((a) => a.status === activeTab);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="animate-spin text-primary" size={32} />
+      <div className="space-y-6">
+        <CFSkeleton lines={1} className="w-1/3 h-8" />
+        <div className="flex gap-2 mb-6">
+          <CFSkeleton lines={1} className="w-24 h-10 rounded-full" />
+          <CFSkeleton lines={1} className="w-24 h-10 rounded-full" />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <CFSkeleton card lines={3} className="h-40" />
+          <CFSkeleton card lines={3} className="h-40" />
+        </div>
       </div>
     );
   }
 
   if (!assignments.length) {
     return (
-      <div className="text-center py-16 space-y-3">
-        <ClipboardList className="mx-auto text-muted-foreground" size={48} />
-        <h2 className="text-xl font-bold text-foreground">No Assignments Yet</h2>
-        <p className="text-muted-foreground text-sm">Upload a notice to automatically create assignments.</p>
-      </div>
+      <CFEmptyState 
+        icon={ClipboardList}
+        title="No Assignments Yet"
+        description="Upload a notice to automatically create assignments."
+      />
     );
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-10">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Assignment Hub</h1>
-        <p className="text-muted-foreground text-sm mt-1">Track and manage your assignments</p>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Assignment Hub</h1>
+        <p className="text-[var(--text-secondary)] text-sm mt-1">Track and manage your assignments</p>
       </div>
 
-      {Object.entries(grouped).map(([status, items]) => {
-        if (!items.length) return null;
-        const { color, icon: Icon } = STATUS_CONFIG[status];
-        return (
-          <div key={status}>
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-              <Icon size={16} /> {status} ({items.length})
-            </h3>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {items.map((a) => (
-                <div key={a._id} className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-3">
-                  <div className="flex items-start justify-between">
-                    <h4 className="font-semibold text-foreground text-sm leading-snug">{a.title}</h4>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${color}`}>{status}</span>
-                  </div>
-                  {a.subject && <p className="text-xs text-muted-foreground">Subject: {a.subject}</p>}
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    {a.deadline && (
-                      <span className="flex items-center gap-1">
-                        <Clock size={12} /> {new Date(a.deadline).toLocaleDateString()}
-                      </span>
+      {/* Status Tabs */}
+      <div className="flex overflow-x-auto pb-2 gap-2 hide-scrollbar">
+        {tabs.map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={cn(
+              "whitespace-nowrap px-5 py-2 rounded-full text-sm font-medium transition-all duration-200",
+              activeTab === tab
+                ? "bg-[#6A68DF] text-white shadow-md"
+                : "bg-transparent text-[var(--text-secondary)] hover:bg-[var(--card)] border border-transparent hover:border-[var(--border)]"
+            )}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {/* Cards Grid */}
+      {filteredAssignments.length === 0 ? (
+        <CFEmptyState 
+          icon={CheckCircle2}
+          title={`No ${activeTab} assignments`}
+          description="You're all caught up in this category!"
+        />
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredAssignments.map((a) => {
+            const isOverdue = a.status === 'Missed' || (a.status !== 'Submitted' && a.deadline && new Date(a.deadline) < new Date());
+            
+            // Priority Badge Logic
+            let priorityVariant = "default";
+            if (a.priorityLevel === 'high' || a.priorityLevel === 'critical') priorityVariant = "high";
+            else if (a.priorityLevel === 'medium') priorityVariant = "medium";
+            else if (a.priorityLevel === 'low') priorityVariant = "low";
+
+            return (
+              <CFCard key={a._id} className={cn("flex flex-col h-full", isOverdue && "border-l-4 border-l-red-500")}>
+                <div className="flex items-start justify-between mb-3 gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    {a.subject && (
+                      <CFBadge variant="default" className="text-[10px]">
+                        {a.subject}
+                      </CFBadge>
                     )}
-                    <span className={`font-medium ${PRIORITY_COLORS[a.priorityLevel] || ''}`}>
-                      {a.priorityLevel}
-                    </span>
-                  </div>
-                  <div className="flex gap-2 pt-1">
-                    {status === 'Not Started' && (
-                      <ActionBtn
-                        onClick={() => updateStatus(a._id, 'In Progress')}
-                        loading={updating === a._id}
-                        icon={Play} label="Start"
-                      />
+                    {a.priorityLevel && a.priorityLevel !== 'low' && (
+                      <CFBadge variant={priorityVariant} className="text-[10px] uppercase">
+                        {a.priorityLevel}
+                      </CFBadge>
                     )}
-                    {(status === 'Not Started' || status === 'In Progress') && (
-                      <ActionBtn
-                        onClick={() => updateStatus(a._id, 'Submitted')}
-                        loading={updating === a._id}
-                        icon={CheckCircle2} label="Mark Submitted"
-                        variant="green"
-                      />
-                    )}
-                    <ActionBtn
-                      onClick={() => alert('Reminder set! (stub)')}
-                      icon={Bell} label="Remind"
-                      variant="outline"
-                    />
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+                
+                <h4 className="font-semibold text-[var(--text-primary)] text-base mb-3 leading-snug">
+                  {a.title}
+                </h4>
+                
+                <div className="mt-auto space-y-3">
+                  <div className="flex flex-col gap-1.5 text-xs text-[var(--text-secondary)]">
+                    {a.deadline && (
+                      <span className={cn("flex items-center gap-1.5 font-medium", isOverdue ? "text-red-500" : "")}>
+                        <Clock size={14} /> Due: {new Date(a.deadline).toLocaleDateString()}
+                      </span>
+                    )}
+                    {a.submissionMode && (
+                      <span className="flex items-center gap-1.5">
+                        <Info size={14} /> Mode: <span className="capitalize">{a.submissionMode}</span>
+                      </span>
+                    )}
+                  </div>
 
-function ActionBtn({ onClick, loading, icon: Icon, label, variant = 'default' }) {
-  const base = 'flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50';
-  const variants = {
-    default: 'bg-primary/10 text-primary hover:bg-primary/20',
-    green: 'bg-green-100 text-green-700 hover:bg-green-200',
-    outline: 'border border-border text-muted-foreground hover:bg-accent',
-  };
-  return (
-    <button onClick={onClick} disabled={loading} className={`${base} ${variants[variant]}`}>
-      {Icon && <Icon size={12} />} {label}
-    </button>
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-[var(--border)]">
+                    {a.status === 'Not Started' && (
+                      <CFButton
+                        onClick={() => updateStatus(a._id, 'In Progress')}
+                        loading={updating === a._id}
+                        icon={Play} size="sm" variant="primary" className="flex-1 text-xs py-1.5"
+                      >
+                        Start
+                      </CFButton>
+                    )}
+                    {(a.status === 'Not Started' || a.status === 'In Progress') && (
+                      <CFButton
+                        onClick={() => updateStatus(a._id, 'Submitted')}
+                        loading={updating === a._id}
+                        icon={CheckCircle2} size="sm" variant="secondary" className="flex-1 text-xs py-1.5 hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-900/20"
+                      >
+                        Submit
+                      </CFButton>
+                    )}
+                    {a.status !== 'Submitted' && (
+                      <CFButton
+                        onClick={() => alert('Reminder set! (stub)')}
+                        icon={Bell} size="sm" variant="ghost" className="flex-1 text-xs py-1.5"
+                      >
+                        Remind
+                      </CFButton>
+                    )}
+                  </div>
+                </div>
+              </CFCard>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

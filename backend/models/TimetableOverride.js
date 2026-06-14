@@ -3,31 +3,29 @@ import mongoose from 'mongoose';
 const timetableOverrideSchema = new mongoose.Schema(
   {
     batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Batch', required: true },
-    timetableId: { type: mongoose.Schema.Types.ObjectId, ref: 'Timetable', required: true },
-    slotIndex: { type: Number, required: true },
-    effectiveDate: { type: Date, required: true },
+    originalSlotId: { type: mongoose.Schema.Types.ObjectId, required: true }, // References a slot in Timetable.slots
+    date: { type: String, required: true }, // Format YYYY-MM-DD
     overrideType: {
       type: String,
       enum: ['rescheduled', 'cancelled', 'room_changed', 'faculty_changed'],
       required: true,
     },
-    newTime: { type: String, default: null },
-    newVenue: { type: String, default: null },
-    newFaculty: { type: String, default: null },
-    newDay: {
-      type: String,
-      enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-      default: null,
+    newDetails: {
+      time: { type: String },
+      venue: { type: String },
+      faculty: { type: String },
     },
     reason: { type: String, default: '' },
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    source: { type: String, enum: ['admin', 'notice_ai'], default: 'admin' },
-    flaggedForReview: { type: Boolean, default: false },
+    adminName: { type: String, default: 'AI System' },
+    status: {
+      type: String,
+      enum: ['active', 'pending_review'],
+      default: 'active',
+    },
   },
   { timestamps: true }
 );
 
-timetableOverrideSchema.index({ batchId: 1, effectiveDate: 1 });
-timetableOverrideSchema.index({ timetableId: 1, effectiveDate: 1 });
+timetableOverrideSchema.index({ batchId: 1, date: 1 });
 
 export const TimetableOverride = mongoose.model('TimetableOverride', timetableOverrideSchema);

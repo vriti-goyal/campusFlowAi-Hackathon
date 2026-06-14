@@ -1,18 +1,21 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { UserCircle, Save, Loader2, Pencil, X, Mail, Building2, BookOpen, Hash, Award, Briefcase, Clock, Moon } from 'lucide-react';
+import { Save, Loader2, Pencil, X, Building2, BookOpen, Hash, Award, Clock, Moon, CheckCircle, AlertCircle } from 'lucide-react';
 import api from '@/lib/api';
+import { CFButton, CFCard, CFBadge, CFSkeleton } from '@/components/ui';
 
 // ── Read-only field display ──
 function InfoField({ icon: Icon, label, value }) {
   if (!value || (Array.isArray(value) && value.length === 0)) return null;
   const display = Array.isArray(value) ? value.join(', ') : value;
   return (
-    <div className="flex items-start gap-3 py-3 border-b border-border/50 last:border-b-0">
-      {Icon && <Icon size={16} className="text-primary mt-0.5 shrink-0" />}
-      <div className="min-w-0">
-        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
-        <p className="text-sm text-foreground mt-0.5">{display}</p>
+    <div className="flex items-start gap-4 py-4 border-b border-[var(--border)] last:border-b-0">
+      {Icon && <div className="w-8 h-8 rounded-full bg-[#6A68DF]/10 flex items-center justify-center shrink-0">
+        <Icon size={16} className="text-[#6A68DF]" />
+      </div>}
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">{label}</p>
+        <p className="text-sm font-medium text-[var(--text-primary)]">{display}</p>
       </div>
     </div>
   );
@@ -22,7 +25,7 @@ function InfoField({ icon: Icon, label, value }) {
 function EditField({ label, name, type = 'text', value, onChange, placeholder, disabled, step }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-xs font-medium text-foreground">{label}</label>
+      <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">{label}</label>
       <input
         type={type}
         name={name}
@@ -31,8 +34,8 @@ function EditField({ label, name, type = 'text', value, onChange, placeholder, d
         placeholder={placeholder}
         disabled={disabled}
         step={step}
-        className={`w-full px-3 py-2 rounded-lg border border-border text-sm transition-colors focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none
-          ${disabled ? 'bg-secondary/50 text-muted-foreground cursor-not-allowed' : 'bg-background text-foreground'}`}
+        className={`w-full px-4 py-2.5 rounded-2xl border border-[var(--border)] bg-[var(--bg)] text-sm transition-all focus:border-[#6A68DF] focus:ring-2 focus:ring-[#6A68DF]/20 outline-none
+          ${disabled ? 'opacity-60 cursor-not-allowed' : 'text-[var(--text-primary)]'}`}
       />
     </div>
   );
@@ -44,7 +47,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [profile, setProfile] = useState(null);
-  const [editProfile, setEditProfile] = useState(null); // copy for editing
+  const [editProfile, setEditProfile] = useState(null);
   const [saveMsg, setSaveMsg] = useState(null);
 
   useEffect(() => {
@@ -62,7 +65,7 @@ export default function ProfilePage() {
   }, []);
 
   const startEditing = () => {
-    setEditProfile(JSON.parse(JSON.stringify(profile))); // deep copy
+    setEditProfile(JSON.parse(JSON.stringify(profile)));
     setEditing(true);
     setSaveMsg(null);
   };
@@ -108,73 +111,94 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center p-10">
-        <Loader2 className="animate-spin text-muted-foreground" size={32} />
+      <div className="space-y-6 max-w-4xl pb-10">
+        <div className="flex items-center gap-6 mb-8">
+          <CFSkeleton className="w-24 h-24 rounded-full" />
+          <div className="space-y-2 flex-1">
+            <CFSkeleton lines={1} className="w-1/3 h-8" />
+            <CFSkeleton lines={1} className="w-1/4 h-4" />
+          </div>
+        </div>
+        <CFSkeleton card lines={6} className="h-64" />
+        <CFSkeleton card lines={4} className="h-40" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-4xl pb-10">
+    <div className="space-y-8 max-w-4xl pb-10">
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <img
-            src={user?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.name || 'U')}&background=6366f1&color=fff&bold=true`}
-            alt="avatar"
-            className="w-14 h-14 rounded-full object-cover border-2 border-primary/30 shadow-md"
-          />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+        <div className="flex items-center gap-5">
+          <div className="relative">
+            <img
+              src={user?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.name || 'U')}&background=6A68DF&color=fff&bold=true`}
+              alt="avatar"
+              className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-4 border-white dark:border-[var(--card)] shadow-lg ring-2 ring-[#6A68DF]/30"
+            />
+            {profile?.profileComplete && (
+              <div className="absolute bottom-0 right-0 w-6 h-6 bg-green-500 rounded-full border-2 border-white dark:border-[var(--card)] flex items-center justify-center shadow-sm" title="Profile Complete">
+                <CheckCircle size={14} className="text-white" />
+              </div>
+            )}
+          </div>
           <div>
-            <h2 className="text-2xl font-bold text-foreground">{profile?.name || 'Student'}</h2>
-            <p className="text-sm text-muted-foreground">{profile?.email}</p>
+            <h2 className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)] leading-tight">{profile?.name || 'Student'}</h2>
+            <p className="text-sm font-medium text-[var(--text-secondary)] mt-1">{profile?.email}</p>
           </div>
         </div>
 
         {!editing ? (
-          <button
+          <CFButton
             onClick={startEditing}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+            variant="secondary"
+            icon={Pencil}
           >
-            <Pencil size={15} /> Update Profile
-          </button>
+            Update Profile
+          </CFButton>
         ) : (
-          <div className="flex gap-2">
-            <button
+          <div className="flex gap-3">
+            <CFButton
               onClick={cancelEditing}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+              variant="ghost"
+              icon={X}
             >
-              <X size={15} /> Cancel
-            </button>
-            <button
+              Cancel
+            </CFButton>
+            <CFButton
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+              loading={saving}
+              variant="primary"
+              icon={Save}
             >
-              {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
               Save Profile
-            </button>
+            </CFButton>
           </div>
         )}
       </div>
 
       {/* ── Success / Error message ── */}
       {saveMsg && (
-        <div className={`px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+        <div className={`px-4 py-3 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in slide-in-from-top-2 ${
           saveMsg.type === 'success'
-            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-            : 'bg-destructive/10 text-destructive border border-destructive/20'
+            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
         }`}>
+          {saveMsg.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
           {saveMsg.text}
         </div>
       )}
 
       {/* ── VIEW MODE ── */}
       {!editing ? (
-        <>
+        <div className="space-y-6">
           {/* Academic Info */}
-          <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Academic Info</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
+          <CFCard className="p-6 sm:p-8">
+            <h3 className="text-sm font-bold text-[#6A68DF] uppercase tracking-wider mb-6 flex items-center gap-2">
+              <BookOpen size={18} /> Academic Information
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12">
               <InfoField icon={Building2} label="College" value={profile?.college} />
               <InfoField icon={BookOpen} label="Branch" value={profile?.branch} />
               <InfoField icon={Hash} label="Semester" value={profile?.semester} />
@@ -182,95 +206,125 @@ export default function ProfilePage() {
               <InfoField icon={Hash} label="Roll Number" value={profile?.rollNumber} />
               <InfoField icon={Award} label="CGPA" value={profile?.cgpa} />
             </div>
-          </div>
+          </CFCard>
 
           {/* Skills & Interests */}
-          <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Skills & Interests</h3>
-            {profile?.skills?.length > 0 && (
-              <div className="mb-4">
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Skills</p>
-                <div className="flex flex-wrap gap-2">
-                  {profile.skills.map((s, i) => (
-                    <span key={i} className="px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">{s}</span>
-                  ))}
+          <CFCard className="p-6 sm:p-8">
+            <h3 className="text-sm font-bold text-[#6A68DF] uppercase tracking-wider mb-6 flex items-center gap-2">
+              <Award size={18} /> Skills & Interests
+            </h3>
+            
+            <div className="space-y-6">
+              {profile?.skills?.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-3">Technical Skills</p>
+                  <div className="flex flex-wrap gap-2">
+                    {profile.skills.map((s, i) => (
+                      <CFBadge key={i} variant="default" className="text-xs px-3 py-1.5">{s}</CFBadge>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-            {profile?.placementInterests?.length > 0 && (
-              <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Placement Interests</p>
-                <div className="flex flex-wrap gap-2">
-                  {profile.placementInterests.map((s, i) => (
-                    <span key={i} className="px-3 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">{s}</span>
-                  ))}
+              )}
+              
+              {profile?.placementInterests?.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-3">Placement Interests</p>
+                  <div className="flex flex-wrap gap-2">
+                    {profile.placementInterests.map((s, i) => (
+                      <CFBadge key={i} variant="medium" className="text-xs px-3 py-1.5 bg-[#EFB995]/20 text-[#D98755] dark:text-[#EFB995] border border-[#EFB995]/30">{s}</CFBadge>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-            {(!profile?.skills?.length && !profile?.placementInterests?.length) && (
-              <p className="text-sm text-muted-foreground">No skills or interests added yet. Click "Update Profile" to add them.</p>
-            )}
-          </div>
+              )}
+              
+              {(!profile?.skills?.length && !profile?.placementInterests?.length) && (
+                <div className="bg-[var(--bg)] border border-[var(--border)] border-dashed rounded-xl p-6 text-center">
+                  <p className="text-sm text-[var(--text-muted)] font-medium">No skills or interests added yet. Click "Update Profile" to add them.</p>
+                </div>
+              )}
+            </div>
+          </CFCard>
 
           {/* Routine */}
           {(profile?.routine?.wakeUpTime || profile?.routine?.sleepTime) && (
-            <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Daily Routine</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
+            <CFCard className="p-6 sm:p-8">
+              <h3 className="text-sm font-bold text-[#6A68DF] uppercase tracking-wider mb-6 flex items-center gap-2">
+                <Clock size={18} /> Daily Routine
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12">
                 <InfoField icon={Clock} label="Wake Up Time" value={profile?.routine?.wakeUpTime} />
                 <InfoField icon={Moon} label="Sleep Time" value={profile?.routine?.sleepTime} />
               </div>
-            </div>
+            </CFCard>
           )}
-        </>
+        </div>
       ) : (
         /* ── EDIT MODE ── */
-        <>
-          <div className="bg-card border border-primary/20 rounded-xl p-6 shadow-sm space-y-1">
-            <div className="flex items-center gap-2 mb-4">
-              <Pencil size={14} className="text-primary" />
-              <h3 className="text-sm font-semibold text-foreground">Editing Profile</h3>
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <CFCard className="p-6 sm:p-8 border-[#6A68DF]/30 ring-1 ring-[#6A68DF]/10 shadow-lg shadow-[#6A68DF]/5">
+            <div className="flex items-center gap-2 mb-8 pb-4 border-b border-[var(--border)]">
+              <div className="w-8 h-8 rounded-full bg-[#6A68DF] flex items-center justify-center">
+                <Pencil size={16} className="text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-[var(--text-primary)]">Edit Profile</h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <EditField label="Name" name="name" value={editProfile?.name || ''} onChange={handleChange} />
-              <EditField label="Email" name="email" value={editProfile?.email || ''} onChange={handleChange} disabled />
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <EditField label="Full Name" name="name" value={editProfile?.name || ''} onChange={handleChange} />
+              <EditField label="Email Address" name="email" value={editProfile?.email || ''} onChange={handleChange} disabled />
+              
+              <div className="md:col-span-2 pt-4">
+                <h4 className="text-sm font-bold text-[var(--text-primary)] mb-4">Academic Details</h4>
+              </div>
+              
               <EditField label="College" name="college" value={editProfile?.college || ''} onChange={handleChange} />
               <EditField label="Branch" name="branch" value={editProfile?.branch || ''} onChange={handleChange} />
               <EditField label="Semester" name="semester" type="number" value={editProfile?.semester || ''} onChange={handleChange} />
               <EditField label="Section" name="section" value={editProfile?.section || ''} onChange={handleChange} />
               <EditField label="Roll Number" name="rollNumber" value={editProfile?.rollNumber || ''} onChange={handleChange} />
               <EditField label="CGPA" name="cgpa" type="number" step="0.01" value={editProfile?.cgpa || ''} onChange={handleChange} />
-              <EditField label="Skills (comma separated)" name="skills" value={editProfile?.skills?.join(', ') || ''} onChange={handleChange} placeholder="React, Node.js, Python" />
-              <EditField label="Placement Interests (comma separated)" name="placementInterests" value={editProfile?.placementInterests?.join(', ') || ''} onChange={handleChange} placeholder="SDE, Data Science, Product" />
+              
+              <div className="md:col-span-2 pt-4">
+                <h4 className="text-sm font-bold text-[var(--text-primary)] mb-4">Skills & Interests</h4>
+              </div>
+              
+              <div className="md:col-span-2">
+                <EditField label="Skills (comma separated)" name="skills" value={editProfile?.skills?.join(', ') || ''} onChange={handleChange} placeholder="e.g., React, Node.js, Python" />
+              </div>
+              <div className="md:col-span-2">
+                <EditField label="Placement Interests (comma separated)" name="placementInterests" value={editProfile?.placementInterests?.join(', ') || ''} onChange={handleChange} placeholder="e.g., SDE, Data Science, Product Management" />
+              </div>
             </div>
-          </div>
+          </CFCard>
 
-          <div className="bg-card border border-primary/20 rounded-xl p-6 shadow-sm">
-            <h3 className="text-sm font-semibold text-foreground mb-4">Daily Routine</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CFCard className="p-6 sm:p-8 border-[#6A68DF]/30 ring-1 ring-[#6A68DF]/10 shadow-lg shadow-[#6A68DF]/5">
+            <h3 className="text-sm font-bold text-[var(--text-primary)] mb-6">Daily Routine</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <EditField label="Wake Up Time" name="routine.wakeUpTime" type="time" value={editProfile?.routine?.wakeUpTime || ''} onChange={handleChange} />
               <EditField label="Sleep Time" name="routine.sleepTime" type="time" value={editProfile?.routine?.sleepTime || ''} onChange={handleChange} />
             </div>
-          </div>
+          </CFCard>
 
           {/* Save / Cancel at bottom too */}
-          <div className="flex justify-end gap-3">
-            <button
+          <div className="flex justify-end gap-3 sticky bottom-4 bg-[var(--bg)]/90 backdrop-blur-md p-4 rounded-2xl border border-[var(--border)] shadow-lg z-10">
+            <CFButton
               onClick={cancelEditing}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+              variant="ghost"
+              icon={X}
             >
-              <X size={15} /> Cancel
-            </button>
-            <button
+              Cancel
+            </CFButton>
+            <CFButton
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+              loading={saving}
+              variant="primary"
+              icon={Save}
             >
-              {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
               Save Profile
-            </button>
+            </CFButton>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

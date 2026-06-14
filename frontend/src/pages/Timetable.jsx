@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Clock, MapPin, User as UserIcon, CalendarDays, BookOpen, Loader2, Upload, Shield, FileText, X } from 'lucide-react';
 import api from '@/lib/api';
+import { CFCard, CFBadge, CFButton, CFEmptyState } from '@/components/ui';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -35,44 +36,44 @@ function ScheduleUploadPanel({ batches, onUploaded }) {
   };
 
   return (
-    <div className="bg-card border border-border rounded-xl p-5 space-y-4 mb-6 shadow-sm">
+    <CFCard className="p-5 space-y-4 mb-6">
       <div className="flex items-center gap-2">
-        <Shield size={16} className="text-primary" />
-        <h3 className="font-semibold text-foreground text-sm">Upload Timetable (Admin)</h3>
+        <Shield size={16} className="text-[#6A68DF]" />
+        <h3 className="font-semibold text-[var(--text-primary)] text-sm">Upload Timetable (Admin)</h3>
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-xs text-[var(--text-muted)]">
         Upload a <strong>PDF/Image</strong> and AI will extract the schedule, or use a <strong>CSV</strong> with columns:{' '}
-        <code className="bg-secondary px-1 rounded">day</code>,{' '}
-        <code className="bg-secondary px-1 rounded">time</code>,{' '}
-        <code className="bg-secondary px-1 rounded">course_code</code>,{' '}
-        <code className="bg-secondary px-1 rounded">course_name</code>,{' '}
-        <code className="bg-secondary px-1 rounded">venue</code>,{' '}
-        <code className="bg-secondary px-1 rounded">faculty</code>
+        <code className="bg-[var(--border)] px-1 rounded">day</code>,{' '}
+        <code className="bg-[var(--border)] px-1 rounded">time</code>,{' '}
+        <code className="bg-[var(--border)] px-1 rounded">course_code</code>,{' '}
+        <code className="bg-[var(--border)] px-1 rounded">course_name</code>,{' '}
+        <code className="bg-[var(--border)] px-1 rounded">venue</code>,{' '}
+        <code className="bg-[var(--border)] px-1 rounded">faculty</code>
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className="text-xs font-medium text-foreground mb-1 block">Batch</label>
+          <label className="text-xs font-medium text-[var(--text-primary)] mb-1 block">Batch</label>
           <select value={selectedBatch} onChange={e => setSelectedBatch(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground focus:border-primary outline-none">
+            className="w-full px-3 py-2 rounded-2xl border border-[var(--border)] bg-[var(--card)] text-sm text-[var(--text-primary)] focus:border-[#6A68DF] outline-none">
             <option value="">Select batch…</option>
             {adminBatches.map(b => <option key={b._id} value={b._id}>{b.batchName}</option>)}
           </select>
         </div>
         <div>
-          <label className="text-xs font-medium text-foreground mb-1 block">PDF / Image / CSV</label>
-          <div onClick={() => fileRef.current?.click()} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border hover:border-primary cursor-pointer transition-colors text-sm text-muted-foreground">
+          <label className="text-xs font-medium text-[var(--text-primary)] mb-1 block">PDF / Image / CSV</label>
+          <div onClick={() => fileRef.current?.click()} className="flex items-center gap-2 px-3 py-2 rounded-2xl border border-dashed border-[var(--border)] hover:border-[#6A68DF] cursor-pointer transition-colors text-sm text-[var(--text-muted)]">
             <FileText size={14} />
-            {file ? <span className="text-foreground truncate">{file.name}</span> : 'Click to choose file'}
-            {file && <button type="button" onClick={e => { e.stopPropagation(); setFile(null); }} className="ml-auto hover:text-destructive"><X size={12}/></button>}
+            {file ? <span className="text-[var(--text-primary)] truncate">{file.name}</span> : 'Click to choose file'}
+            {file && <button type="button" onClick={e => { e.stopPropagation(); setFile(null); }} className="ml-auto hover:text-red-500"><X size={12}/></button>}
           </div>
           <input ref={fileRef} type="file" accept=".csv,.pdf,.png,.jpg,.jpeg" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
         </div>
       </div>
-      {msg && <p className={`text-xs px-3 py-2 rounded-lg ${msg.type === 'success' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-destructive/10 text-destructive'}`}>{msg.text}</p>}
-      <button onClick={handleUpload} disabled={uploading || !selectedBatch || !file} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">
-        {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} {uploading ? 'Uploading…' : 'Upload Schedule'}
-      </button>
-    </div>
+      {msg && <p className={`text-xs px-3 py-2 rounded-xl ${msg.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{msg.text}</p>}
+      <CFButton onClick={handleUpload} disabled={uploading || !selectedBatch || !file} className="w-full sm:w-auto" icon={uploading ? Loader2 : Upload} loading={uploading}>
+        {uploading ? 'Uploading…' : 'Upload Schedule'}
+      </CFButton>
+    </CFCard>
   );
 }
 
@@ -80,7 +81,7 @@ export default function TimetablePage() {
   const [batches, setBatches] = useState([]);
   const [selectedBatch, setSelectedBatch] = useState('all');
   const [activeDay, setActiveDay] = useState(DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]);
-  const [timetables, setTimetables] = useState([]);
+  const [overrides, setOverrides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
 
@@ -88,20 +89,18 @@ export default function TimetablePage() {
     try {
       const res = await api.get('/api/batch/my-batches');
       setBatches(res.data || []);
-      if (res.data?.length > 0 && selectedBatch === 'all') {
-        setSelectedBatch(res.data[0]._id);
-      }
     } catch (err) {
       console.error(err);
     }
   };
 
   const fetchTimetable = async () => {
-    if (!selectedBatch || selectedBatch === 'all') return;
     setLoading(true);
     try {
-      const res = await api.get(`/api/timetable/batch/${selectedBatch}`);
-      setTimetables(res.data.data || []);
+      const endpoint = selectedBatch === 'all' ? '/api/timetable/my-timetable' : `/api/timetable/batch/${selectedBatch}`;
+      const res = await api.get(endpoint);
+      setTimetables(res.data.data.timetables || []);
+      setOverrides(res.data.data.overrides || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -122,24 +121,24 @@ export default function TimetablePage() {
     <div className="space-y-6 max-w-5xl pb-10">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <CalendarDays className="text-primary" size={24} /> Timetable
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
+            <CalendarDays className="text-[#6A68DF]" size={24} /> Timetable
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">Manage your weekly class schedule</p>
+          <p className="text-[var(--text-muted)] text-sm mt-1">Manage your weekly class schedule</p>
         </div>
         <div className="flex items-center gap-3">
           <select 
             value={selectedBatch} 
             onChange={(e) => setSelectedBatch(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-border bg-background text-sm font-medium focus:border-primary outline-none"
+            className="px-3 py-2 rounded-full border border-[var(--border)] bg-[var(--card)] text-sm font-medium focus:border-[#6A68DF] outline-none"
           >
-            {batches.length === 0 ? <option value="all">No Batches found</option> : null}
+            <option value="all">All My Batches</option>
             {batches.map(b => <option key={b._id} value={b._id}>{b.batchName}</option>)}
           </select>
           {hasAdmin && (
-            <button onClick={() => setShowUpload(s => !s)} className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors flex items-center gap-2 ${showUpload ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:bg-secondary hover:text-foreground'}`}>
-              <Upload size={14} /> {showUpload ? 'Hide Upload' : 'Upload Schedule'}
-            </button>
+            <CFButton variant={showUpload ? 'primary' : 'secondary'} size="sm" onClick={() => setShowUpload(s => !s)} icon={showUpload ? X : Upload}>
+              {showUpload ? 'Close Upload' : 'Upload Schedule'}
+            </CFButton>
           )}
         </div>
       </div>
@@ -152,7 +151,7 @@ export default function TimetablePage() {
           <button
             key={day}
             onClick={() => setActiveDay(day)}
-            className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all ${activeDay === day ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-secondary text-muted-foreground hover:bg-secondary/70 hover:text-foreground'}`}
+            className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all ${activeDay === day ? 'bg-[#6A68DF] text-white shadow-sm' : 'bg-[var(--card)] text-[var(--text-secondary)] hover:bg-[#6A68DF]/10 hover:text-[#6A68DF]'}`}
           >
             {day}
           </button>
@@ -160,43 +159,63 @@ export default function TimetablePage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" size={32} /></div>
+        <div className="flex justify-center py-12"><Loader2 className="animate-spin text-[#6A68DF]" size={32} /></div>
       ) : slots.length === 0 ? (
-        <div className="text-center py-16 bg-card border border-border rounded-xl">
-          <BookOpen className="mx-auto text-muted-foreground/50 mb-3" size={40} />
-          <h3 className="text-lg font-medium text-foreground">No Classes on {activeDay}</h3>
-          <p className="text-sm text-muted-foreground mt-1">Enjoy your free time!</p>
-        </div>
+        <CFEmptyState icon={BookOpen} title={`No Classes on ${activeDay}`} description="Enjoy your free time!" />
       ) : (
-        <div className="space-y-3">
-          {slots.sort((a, b) => a.time.localeCompare(b.time)).map((slot, idx) => (
-            <div key={idx} className="bg-card border-l-4 border-l-primary border-t border-r border-b border-border rounded-r-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 shadow-sm hover:shadow-md transition-shadow group">
-              
-              <div className="flex items-center gap-3 sm:w-32 shrink-0 text-foreground font-semibold">
-                <Clock size={16} className="text-primary/70" />
-                {slot.time}
-              </div>
+        <div className="space-y-4 mt-4">
+          {slots.sort((a, b) => a.time.localeCompare(b.time)).map((slot, idx) => {
+            const override = overrides.find(o => o.originalSlotId === slot._id);
+            const isCancelled = override?.overrideType === 'cancelled';
+            const isRescheduled = override?.overrideType === 'rescheduled';
+            const isRoomChanged = override?.overrideType === 'room_changed';
+            const isFacultyChanged = override?.overrideType === 'faculty_changed';
+            
+            const displayTime = isRescheduled && override.newDetails?.time ? override.newDetails.time : slot.time;
+            const displayVenue = (isRescheduled || isRoomChanged) && override.newDetails?.venue ? override.newDetails.venue : slot.venue;
+            const displayFaculty = (isRescheduled || isFacultyChanged) && override.newDetails?.faculty ? override.newDetails.faculty : slot.faculty;
 
-              <div className="flex-1 space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">{slot.courseCode}</span>
-                  <h3 className="font-bold text-foreground text-sm sm:text-base">{slot.courseName || 'Lecture'}</h3>
+            return (
+              <CFCard key={idx} className={`p-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 border-l-4 transition-all ${isCancelled ? 'border-l-red-500 opacity-60' : override ? 'border-l-amber-500 bg-amber-50/30' : 'border-l-[#6A68DF]'}`}>
+                
+                <div className={`flex items-center gap-3 sm:w-32 shrink-0 font-semibold ${isCancelled ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-primary)]'}`}>
+                  <Clock size={16} className={isCancelled ? 'text-[var(--text-muted)]' : 'text-[#6A68DF]'} />
+                  {displayTime}
                 </div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-muted-foreground">
-                  {slot.venue && (
-                    <div className="flex items-center gap-1.5 bg-secondary/50 px-2 py-1 rounded">
-                      <MapPin size={12} /> {slot.venue}
-                    </div>
+
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#6A68DF]/10 text-[#6A68DF] border border-[#6A68DF]/20">{slot.courseCode}</span>
+                    <h3 className={`font-bold text-sm sm:text-base ${isCancelled ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-primary)]'}`}>{slot.courseName || 'Lecture'}</h3>
+                    {override && (
+                      <CFBadge variant={isCancelled ? 'danger' : 'warning'} className="text-[10px] ml-2">
+                        {override.overrideType.replace('_', ' ').toUpperCase()}
+                      </CFBadge>
+                    )}
+                  </div>
+                  
+                  <div className={`flex flex-wrap gap-x-4 gap-y-1 text-xs ${isCancelled ? 'text-[var(--text-muted)] line-through' : 'text-[var(--text-secondary)]'}`}>
+                    {displayVenue && (
+                      <div className="flex items-center gap-1.5 bg-[var(--border)]/50 px-2 py-1 rounded">
+                        <MapPin size={12} /> {displayVenue}
+                      </div>
+                    )}
+                    {displayFaculty && (
+                      <div className="flex items-center gap-1.5 bg-[var(--border)]/50 px-2 py-1 rounded">
+                        <UserIcon size={12} /> {displayFaculty}
+                      </div>
+                    )}
+                  </div>
+                  {override?.reason && !isCancelled && (
+                    <p className="text-xs text-amber-600 mt-1 italic">Reason: {override.reason}</p>
                   )}
-                  {slot.faculty && (
-                    <div className="flex items-center gap-1.5 bg-secondary/50 px-2 py-1 rounded">
-                      <UserIcon size={12} /> {slot.faculty}
-                    </div>
+                  {override?.reason && isCancelled && (
+                    <p className="text-xs text-red-500 mt-1 italic">Reason: {override.reason}</p>
                   )}
                 </div>
-              </div>
-            </div>
-          ))}
+              </CFCard>
+            );
+          })}
         </div>
       )}
     </div>

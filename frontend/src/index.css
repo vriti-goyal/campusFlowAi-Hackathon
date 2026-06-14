@@ -1,38 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
-    --primary: 252 100% 69%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 222 47% 11%;
-    --secondary-foreground: 213 31% 91%;
-    --muted: 223 47% 11%;
-    --muted-foreground: 215 16% 57%;
-    --accent: 216 34% 17%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 216 34% 17%;
-    --input: 216 34% 17%;
-    --ring: 252 100% 69%;
-    --radius: 0.5rem;
+    --bg: #F4F5F7;
+    --card: #FEFEFE;
+    --card-elevated: #FFFFFF;
+    --text-primary: #2E2C2D;
+    --text-secondary: #77777A;
+    --text-muted: #9A9AA0;
+    --primary: #6A68DF;
+    --accent: #EFB995;
+    --border: rgba(46, 44, 45, 0.08);
+    --shadow: 0 2px 16px rgba(46, 44, 45, 0.06);
+    --radius-card: 20px;
+    --radius-btn: 50px;
   }
 
-  * {
-    @apply border-border;
+
+
+  * { 
+    font-family: 'Poppins', sans-serif; 
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    background-color: var(--bg);
+    color: var(--text-primary);
+    transition: background-color 0.2s, color 0.2s;
   }
 
   /* Custom scrollbar */
   ::-webkit-scrollbar { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track { background: hsl(var(--secondary)); }
-  ::-webkit-scrollbar-thumb { background: hsl(var(--primary) / 0.5); border-radius: 999px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: rgba(106, 104, 223, 0.5); border-radius: 999px; }
 }

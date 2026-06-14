@@ -1,8 +1,8 @@
-// src/pages/Login.jsx
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { GraduationCap } from 'lucide-react';
+import { Zap, CheckCircle2 } from 'lucide-react';
+import { CFButton, CFCard, CFBadge } from '@/components/ui';
 
 export default function LoginPage() {
   const { user, loading, signInWithGoogle } = useAuth();
@@ -20,36 +20,56 @@ export default function LoginPage() {
     }
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
-      {/* Background gradient blobs */}
-      <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-primary/20 blur-3xl" />
-      <div className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-primary/10 blur-3xl" />
+  const features = [
+    "AI-powered campus updates",
+    "Smart assignment tracking",
+    "Personalized placement intel"
+  ];
 
-      <div className="relative z-10 w-full max-w-sm mx-4">
-        {/* Card */}
-        <div className="bg-secondary/60 backdrop-blur-xl border border-border rounded-2xl p-8 shadow-2xl shadow-primary/10">
-          {/* Logo */}
-          <div className="flex flex-col items-center mb-8">
-            <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center mb-4">
-              <GraduationCap className="text-primary" size={28} />
+  return (
+    <div className="min-h-screen flex flex-col md:flex-row bg-[var(--bg)] transition-colors duration-200">
+      {/* Left Half - Gradient Banner */}
+      <div 
+        className="w-full md:w-1/2 p-8 md:p-16 flex flex-col justify-center text-white min-h-[300px] md:min-h-screen"
+        style={{ background: 'linear-gradient(135deg, #6A68DF 0%, #B78AEF 45%, #EFB995 100%)' }}
+      >
+        <div className="max-w-md mx-auto md:mx-0">
+          <div className="flex items-center gap-2 mb-6">
+            <Zap className="w-10 h-10 text-white" />
+            <h1 className="text-4xl font-bold tracking-tight">CampusFlow AI</h1>
+          </div>
+          <h2 className="text-2xl md:text-3xl font-semibold mb-8 opacity-90 leading-snug">
+            One platform.<br/>Every update.<br/>Every deadline.
+          </h2>
+          
+          <ul className="space-y-4">
+            {features.map((feature, idx) => (
+              <li key={idx} className="flex items-center gap-3 text-lg opacity-90">
+                <CheckCircle2 className="w-6 h-6 shrink-0" />
+                <span>{feature}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      {/* Right Half - Login Form */}
+      <div className="w-full md:w-1/2 flex items-center justify-center p-6 bg-[var(--bg)]">
+        <CFCard className="w-full max-w-md p-8 md:p-10 border-none shadow-2xl shadow-black/5 dark:shadow-black/20">
+          <div className="flex flex-col items-center text-center mb-8">
+            <div className="w-16 h-16 rounded-[20px] bg-gradient-to-br from-[#6A68DF]/20 to-[#EFB995]/20 flex items-center justify-center mb-6">
+              <Zap className="w-8 h-8 text-[#6A68DF]" />
             </div>
-            <h1 className="text-2xl font-bold text-foreground">CampusFlow <span className="text-primary">AI</span></h1>
-            <p className="text-sm text-muted-foreground mt-1">Your student operations hub</p>
+            <h3 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Welcome back</h3>
+            <p className="text-[var(--text-secondary)] mb-4">Sign in to your student hub</p>
+            <CFBadge variant="default" className="text-xs font-semibold py-1">Powered by AI</CFBadge>
           </div>
 
-          {/* Sign-in button */}
-          <button
-            id="google-signin-btn"
+          <CFButton
+            variant="secondary"
+            className="w-full py-3 flex items-center justify-center gap-3 bg-[var(--card)] hover:bg-[var(--bg)]"
             onClick={handleGoogleSignIn}
             disabled={loading}
-            className="
-              w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl
-              bg-white text-gray-700 font-medium text-sm
-              hover:bg-gray-100 active:scale-95
-              transition-all duration-150 shadow-md
-              disabled:opacity-50 disabled:cursor-not-allowed
-            "
           >
             {/* Google "G" logo */}
             <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
@@ -58,15 +78,15 @@ export default function LoginPage() {
               <path fill="#4CAF50" d="M24 45c5.2 0 10-1.9 13.6-5l-6.3-5.1C29.4 36.5 26.8 37 24 37c-5.2 0-9.6-3.3-11.3-8H6.1v5.4C9.5 40.9 16.3 45 24 45z" />
               <path fill="#1976D2" d="M43.6 20H24v8h11.3c-.9 2.4-2.5 4.4-4.6 5.8l6.3 5.1C40.7 36.1 44 30.5 44 24c0-1.4-.1-2.7-.4-4z" />
             </svg>
-            {loading ? 'Signing in…' : 'Continue with Google'}
-          </button>
-
-          <p className="text-xs text-center text-muted-foreground mt-6">
+            {loading ? 'Signing in...' : 'Continue with Google'}
+          </CFButton>
+          
+          <p className="text-xs text-center text-[var(--text-muted)] mt-8">
             By signing in you agree to our{' '}
-            <span className="text-primary cursor-pointer hover:underline">Terms</span> &amp;{' '}
-            <span className="text-primary cursor-pointer hover:underline">Privacy Policy</span>
+            <span className="text-[#6A68DF] cursor-pointer hover:underline">Terms</span> &amp;{' '}
+            <span className="text-[#6A68DF] cursor-pointer hover:underline">Privacy Policy</span>
           </p>
-        </div>
+        </CFCard>
       </div>
     </div>
   );

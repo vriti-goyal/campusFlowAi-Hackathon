@@ -5,7 +5,7 @@ import { ExamSchedule } from '../models/ExamSchedule.js';
 import { BatchMember } from '../models/BatchMember.js';
 import { Batch } from '../models/Batch.js';
 import { uploadToS3 } from '../config/s3.js';
-import { extractTextFromFile } from '../config/textract.js';
+import { invokeAIVision } from '../config/gemini.js';
 import { extractExamScheduleFromText } from '../services/documentExtractor.js';
 import { ok, fail } from '../utils/response.js';
 
@@ -112,7 +112,7 @@ router.post('/upload', verifyFirebaseToken, fileUpload.single('file'), async (re
       console.log('[ExamSchedule] PDF/image upload detected, running AI extraction...');
 
       const fileUrl = await uploadToS3(req.file.buffer, req.file.originalname, req.file.mimetype);
-      const extractedText = await extractTextFromFile(fileUrl);
+      const extractedText = await invokeAIVision(req.file.buffer, req.file.mimetype);
 
       if (!extractedText || !extractedText.trim()) {
         return fail(res, 'Could not extract text from the uploaded file. Try a clearer image/PDF.', 400);

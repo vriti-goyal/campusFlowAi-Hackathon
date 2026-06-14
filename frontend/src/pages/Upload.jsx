@@ -1,6 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
-import { Upload, FileText, CheckCircle, XCircle, Edit3, Loader2, Layers, User, ChevronDown, CalendarDays, BookOpen, Sparkles } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Upload, FileText, CheckCircle, XCircle, Loader2, Layers, ChevronDown, CalendarDays, BookOpen, Sparkles, AlertCircle } from 'lucide-react';
 import api from '@/lib/api';
+import { CFButton, CFCard, CFBadge, CFSkeleton } from '@/components/ui';
+import { cn } from '@/lib/utils';
 
 const PROGRESS_STEPS = [
   'Extracting text...',
@@ -13,17 +15,17 @@ const PROGRESS_STEPS = [
 // ── Batch Selector ─────────────────────────────────────────────────────────────
 function BatchSelector({ batches, value, onChange, loadingBatches }) {
   return (
-    <div>
-      <label className="block text-sm font-semibold text-foreground mb-1.5">
-        Upload For <span className="text-destructive">*</span>
+    <div className="mb-6">
+      <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
+        Upload For <span className="text-red-500">*</span>
       </label>
       <div className="relative">
-        <Layers size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        <Layers size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
         <select
           id="upload-target"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full pl-9 pr-10 py-2.5 rounded-lg border border-border bg-background text-sm text-foreground focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none appearance-none cursor-pointer"
+          className="w-full pl-12 pr-10 py-3 rounded-2xl border border-[var(--border)] bg-[var(--bg)] text-sm text-[var(--text-primary)] focus:ring-2 focus:ring-[#6A68DF]/30 focus:border-[#6A68DF] outline-none appearance-none cursor-pointer transition-all"
           disabled={loadingBatches}
         >
           <option value="personal">📎 Personal Use (not shared)</option>
@@ -35,10 +37,10 @@ function BatchSelector({ batches, value, onChange, loadingBatches }) {
             </option>
           ))}
         </select>
-        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
       </div>
       {value !== 'personal' && batches.length > 0 && (
-        <p className="text-xs text-muted-foreground mt-1">
+        <p className="text-xs text-[var(--text-muted)] mt-2 font-medium">
           This will be shared with all members of the selected batch.
         </p>
       )}
@@ -106,7 +108,6 @@ export default function UploadPage() {
       const progressPromise = simulateProgress();
       const isPersonal = targetBatchId === 'personal';
 
-      // batchId is still required by the backend; use the real batch ID or a placeholder
       const batchId = isPersonal ? 'personal' : targetBatchId;
       const body = {
         batchId,
@@ -133,7 +134,6 @@ export default function UploadPage() {
       await progressPromise;
       const responseData = response.data.data;
 
-      // Check if the backend auto-detected a timetable or exam schedule
       if (responseData.autoDetected) {
         setResult({ autoDetected: responseData.autoDetected, message: responseData.message, ...responseData });
       } else {
@@ -170,20 +170,27 @@ export default function UploadPage() {
     const isExam = result.autoDetected === 'exam_schedule';
     const Icon = isExam ? BookOpen : CalendarDays;
     return (
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900 rounded-2xl p-8 text-center space-y-4">
-          <div className="flex items-center justify-center gap-3">
-            <Sparkles className="text-purple-500" size={28} />
-            <Icon className="text-purple-500" size={40} />
+      <div className="max-w-2xl mx-auto pb-10">
+        <CFCard gradient className="text-center p-8 space-y-6">
+          <div className="flex items-center justify-center gap-4">
+            <Sparkles className="text-white animate-pulse" size={32} />
+            <Icon className="text-white" size={48} />
+            <Sparkles className="text-white animate-pulse" size={32} />
           </div>
-          <h2 className="text-xl font-bold text-purple-700 dark:text-purple-400">AI Auto-Detected!</h2>
-          <p className="text-purple-600 dark:text-purple-400 text-sm">{result.message}</p>
-          {result.totalSlots && <p className="text-xs text-muted-foreground">✅ {result.totalSlots} slots across {result.updatedDays} days saved to timetable</p>}
-          {result.inserted && <p className="text-xs text-muted-foreground">✅ {result.inserted} exam entries saved to schedule</p>}
-          <button onClick={resetAll} className="mt-4 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
-            Upload Another
-          </button>
-        </div>
+          <h2 className="text-2xl font-bold text-white">AI Auto-Detected!</h2>
+          <p className="text-white/90 text-sm font-medium">{result.message}</p>
+          
+          <div className="bg-black/10 rounded-xl p-4 inline-block text-left space-y-2">
+            {result.totalSlots && <p className="text-sm text-white/90 font-medium">✅ {result.totalSlots} slots across {result.updatedDays} days saved to timetable</p>}
+            {result.inserted && <p className="text-sm text-white/90 font-medium">✅ {result.inserted} exam entries saved to schedule</p>}
+          </div>
+          
+          <div>
+            <CFButton variant="secondary" onClick={resetAll} className="mt-4 px-8">
+              Upload Another
+            </CFButton>
+          </div>
+        </CFCard>
       </div>
     );
   }
@@ -192,19 +199,21 @@ export default function UploadPage() {
   if (finalized) {
     const targetBatch = batches.find((b) => b._id === targetBatchId);
     return (
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 rounded-2xl p-8 text-center space-y-4">
-          <CheckCircle className="mx-auto text-green-500" size={48} />
-          <h2 className="text-xl font-bold text-green-700 dark:text-green-400">Entry Created Successfully!</h2>
-          <p className="text-green-600 dark:text-green-500 text-sm">
-            A <span className="font-semibold">{result.extraction.category}</span> entry has been added
+      <div className="max-w-2xl mx-auto pb-10">
+        <CFCard className="text-center p-8 space-y-6 border-green-200 bg-green-50 dark:bg-green-900/10 dark:border-green-900">
+          <CheckCircle className="mx-auto text-green-500" size={56} />
+          <h2 className="text-2xl font-bold text-green-700 dark:text-green-400">Entry Created Successfully!</h2>
+          <p className="text-green-600 dark:text-green-500 text-sm font-medium leading-relaxed max-w-md mx-auto">
+            A <span className="font-bold">{result.extraction.category}</span> entry has been added
             {targetBatch ? ` and shared with batch "${targetBatch.batchName}"` : ' to your personal records'}.
             A calendar event was created automatically.
           </p>
-          <button onClick={resetAll} className="mt-4 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
-            Upload Another
-          </button>
-        </div>
+          <div>
+            <CFButton variant="primary" onClick={resetAll} className="mt-4 px-8 bg-green-600 hover:bg-green-700 border-none text-white">
+              Upload Another
+            </CFButton>
+          </div>
+        </CFCard>
       </div>
     );
   }
@@ -213,151 +222,192 @@ export default function UploadPage() {
   if (result) {
     const { extraction } = result;
     return (
-      <div className="max-w-2xl mx-auto space-y-6">
-        <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-          <h2 className="text-lg font-bold text-foreground mb-1 flex items-center gap-2">
-            <FileText size={20} className="text-primary" /> AI Extraction Review
-          </h2>
-          <p className="text-sm text-muted-foreground mb-4">The AI found the following. Please review and confirm.</p>
-
-          <div className="space-y-3 text-sm">
-            <Row label="Category" value={extraction.category} />
-            <Row label="Title" value={extraction.title} />
-            <Row label="Summary" value={extraction.summary} />
-            <Row label="Action Required" value={extraction.actionRequired} />
-            <Row label="Deadline" value={extraction.deadline ? new Date(extraction.deadline).toLocaleDateString() : '—'} />
-            <Row label="Priority" value={`${extraction.priorityLevel} (${extraction.priorityScore}/100)`} />
-            {extraction.company && <Row label="Company" value={extraction.company} />}
-            {extraction.role && <Row label="Role" value={extraction.role} />}
-            {extraction.package && <Row label="Package" value={extraction.package} />}
-            {extraction.minimumCgpa > 0 && <Row label="Min CGPA" value={extraction.minimumCgpa} />}
-            {extraction.eligibleBranches?.length > 0 && (
-              <Row label="Branches" value={extraction.eligibleBranches.join(', ')} />
-            )}
+      <div className="max-w-2xl mx-auto space-y-6 pb-10">
+        <CFCard className="p-6">
+          <div className="flex items-center gap-3 mb-6 border-b border-[var(--border)] pb-4">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#6A68DF] to-[#EFB995] flex items-center justify-center shadow-md">
+              <Sparkles size={20} className="text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">AI Extraction Review</h2>
+              <p className="text-sm text-[var(--text-secondary)]">Please review and confirm the extracted details.</p>
+            </div>
           </div>
 
-          <div className="flex gap-3 mt-6">
-            <button onClick={handleConfirm} disabled={loading}
-              className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50">
-              <CheckCircle size={16} /> Confirm
-            </button>
-            <button onClick={handleDiscard}
-              className="flex items-center gap-2 px-5 py-2.5 border border-destructive/30 text-destructive rounded-lg hover:bg-destructive/10 transition-colors">
-              <XCircle size={16} /> Discard
-            </button>
+          <div className="bg-[var(--bg)] rounded-xl border border-[var(--border)] overflow-hidden">
+            <div className="divide-y divide-[var(--border)]">
+              <ReviewRow label="Category" value={<CFBadge className="capitalize">{extraction.category}</CFBadge>} />
+              <ReviewRow label="Title" value={<span className="font-semibold text-[var(--text-primary)]">{extraction.title}</span>} />
+              <ReviewRow label="Summary" value={extraction.summary} />
+              
+              {extraction.actionRequired && (
+                <ReviewRow label="Action Required" value={
+                  <div className="flex items-start gap-2 text-[#6A68DF] bg-[#6A68DF]/10 p-2 rounded-lg text-sm font-medium">
+                    <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                    <span>{extraction.actionRequired}</span>
+                  </div>
+                } />
+              )}
+              
+              <ReviewRow label="Deadline" value={extraction.deadline ? new Date(extraction.deadline).toLocaleDateString() : '—'} />
+              <ReviewRow label="Priority" value={
+                <CFBadge variant={extraction.priorityLevel === 'high' ? 'high' : extraction.priorityLevel === 'medium' ? 'medium' : 'low'} className="uppercase">
+                  {extraction.priorityLevel} ({extraction.priorityScore}/100)
+                </CFBadge>
+              } />
+              
+              {extraction.company && <ReviewRow label="Company" value={<span className="font-semibold">{extraction.company}</span>} />}
+              {extraction.role && <ReviewRow label="Role" value={extraction.role} />}
+              {extraction.package && <ReviewRow label="Package" value={<span className="text-[#EFB995] font-semibold">{extraction.package}</span>} />}
+              {extraction.minimumCgpa > 0 && <ReviewRow label="Min CGPA" value={extraction.minimumCgpa} />}
+              {extraction.eligibleBranches?.length > 0 && (
+                <ReviewRow label="Branches" value={
+                  <div className="flex flex-wrap gap-1.5">
+                    {extraction.eligibleBranches.map((b, i) => <CFBadge key={i} variant="default" className="text-[10px]">{b}</CFBadge>)}
+                  </div>
+                } />
+              )}
+            </div>
           </div>
-        </div>
+
+          <div className="flex gap-3 mt-8">
+            <CFButton onClick={handleConfirm} disabled={loading} loading={loading} icon={CheckCircle} className="flex-1 bg-green-600 hover:bg-green-700 text-white border-none py-2.5">
+              Confirm & Save
+            </CFButton>
+            <CFButton variant="ghost" onClick={handleDiscard} icon={XCircle} className="flex-1 text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 py-2.5">
+              Discard
+            </CFButton>
+          </div>
+        </CFCard>
       </div>
     );
   }
 
   // ── Upload form ───
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-8 pb-10">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Upload Center</h1>
-        <p className="text-muted-foreground text-sm mt-1">
+        <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
+          <Upload className="text-[#6A68DF]" size={24} /> Upload Center
+        </h1>
+        <p className="text-[var(--text-secondary)] text-sm mt-1">
           Upload a document or paste text. AI will extract info and create calendar entries automatically.
         </p>
       </div>
 
       {error && (
-        <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-lg px-4 py-3 text-sm">
-          {error}
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 rounded-xl px-4 py-3 text-sm font-medium flex items-center gap-2">
+          <AlertCircle size={16} /> {error}
         </div>
       )}
 
-      {/* Batch selector — Feature 3 */}
-      <BatchSelector
-        batches={batches}
-        value={targetBatchId}
-        onChange={setTargetBatchId}
-        loadingBatches={loadingBatches}
-      />
-
-      {/* Mode toggle */}
-      <div className="flex gap-2">
-        <button onClick={() => setMode('file')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'file' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
-          File Upload
-        </button>
-        <button onClick={() => setMode('text')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'text' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
-          Paste Text
-        </button>
-      </div>
-
-      {mode === 'file' ? (
-        <div
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-border rounded-xl p-10 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"
-        >
-          <Upload className="mx-auto text-muted-foreground mb-3" size={36} />
-          {file ? (
-            <p className="text-sm font-medium text-foreground">{file.name}</p>
-          ) : (
-            <>
-              <p className="text-sm font-medium text-foreground">Drop file here or click to browse</p>
-              <p className="text-xs text-muted-foreground mt-1">PDF, PNG, JPG — max 10MB</p>
-            </>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.png,.jpg,.jpeg"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-        </div>
-      ) : (
-        <textarea
-          rows={8}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Paste the notice, circular, or announcement text here..."
-          className="w-full px-4 py-3 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm resize-none"
+      <CFCard className="p-6">
+        {/* Batch selector */}
+        <BatchSelector
+          batches={batches}
+          value={targetBatchId}
+          onChange={setTargetBatchId}
+          loadingBatches={loadingBatches}
         />
-      )}
 
-      {/* Progress indicator */}
-      {loading && progressStep >= 0 && (
-        <div className="bg-card border border-border rounded-lg p-4 space-y-2">
-          {PROGRESS_STEPS.map((step, i) => (
-            <div key={i} className={`flex items-center gap-2 text-sm ${i <= progressStep ? 'text-primary' : 'text-muted-foreground/50'}`}>
-              {i < progressStep ? (
-                <CheckCircle size={14} className="text-green-500" />
-              ) : i === progressStep ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <span className="w-3.5 h-3.5 rounded-full border border-current inline-block" />
-              )}
-              {step}
-            </div>
-          ))}
+        {/* Mode toggle */}
+        <div className="flex bg-[var(--bg)] p-1 rounded-full mb-6 border border-[var(--border)] w-fit mx-auto sm:mx-0">
+          <button onClick={() => setMode('file')}
+            className={cn("px-6 py-2 rounded-full text-sm font-bold transition-all duration-300", mode === 'file' ? "bg-white dark:bg-[var(--card)] text-[#6A68DF] shadow-sm" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]")}>
+            File Upload
+          </button>
+          <button onClick={() => setMode('text')}
+            className={cn("px-6 py-2 rounded-full text-sm font-bold transition-all duration-300", mode === 'text' ? "bg-white dark:bg-[var(--card)] text-[#6A68DF] shadow-sm" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]")}>
+            Paste Text
+          </button>
         </div>
-      )}
 
-      <button
-        id="upload-submit"
-        onClick={handleSubmit}
-        disabled={loading || (mode === 'file' && !file) || (mode === 'text' && !text.trim())}
-        className="w-full py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-      >
-        {loading
-          ? <><Loader2 size={18} className="animate-spin" /> Processing...</>
-          : <><Upload size={18} /> Upload &amp; Process</>}
-      </button>
+        {mode === 'file' ? (
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={cn(
+              "border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all duration-300 group",
+              file ? "border-[#6A68DF] bg-[#6A68DF]/5" : "border-[#6A68DF]/30 hover:border-[#6A68DF] hover:bg-[#6A68DF]/5 bg-[var(--bg)]"
+            )}
+          >
+            <div className={cn("w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 transition-all duration-300", file ? "bg-[#6A68DF] text-white" : "bg-[#6A68DF]/10 text-[#6A68DF] group-hover:scale-110")}>
+              {file ? <FileText size={28} /> : <Upload size={28} />}
+            </div>
+            
+            {file ? (
+              <div>
+                <p className="text-base font-bold text-[var(--text-primary)]">{file.name}</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1 font-medium">Click to change file</p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-base font-bold text-[var(--text-primary)]">Drop file here or click to browse</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1.5 font-medium">PDF, PNG, JPG — max 10MB</p>
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </div>
+        ) : (
+          <textarea
+            rows={8}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Paste the notice, circular, or announcement text here..."
+            className="w-full px-5 py-4 rounded-2xl border border-[#6A68DF]/30 bg-[var(--bg)] focus:ring-2 focus:ring-[#6A68DF]/20 focus:border-[#6A68DF] outline-none text-sm resize-none transition-all text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+          />
+        )}
+
+        {/* Progress indicator */}
+        {loading && progressStep >= 0 && (
+          <div className="mt-6 bg-[var(--bg)] border border-[var(--border)] rounded-2xl p-5 space-y-3">
+            <h4 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2">AI Processing</h4>
+            {PROGRESS_STEPS.map((step, i) => (
+              <div key={i} className={cn("flex items-center gap-3 text-sm font-medium transition-all duration-300", 
+                i < progressStep ? "text-green-500" : 
+                i === progressStep ? "text-[#6A68DF]" : 
+                "text-[var(--text-muted)] opacity-50"
+              )}>
+                {i < progressStep ? (
+                  <CheckCircle size={16} />
+                ) : i === progressStep ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <div className="w-4 h-4 rounded-full border-2 border-current flex items-center justify-center shrink-0" />
+                )}
+                {step}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <CFButton
+          onClick={handleSubmit}
+          disabled={loading || (mode === 'file' && !file) || (mode === 'text' && !text.trim())}
+          loading={loading}
+          variant="primary"
+          icon={Upload}
+          className="w-full py-3.5 mt-6 text-sm"
+        >
+          {loading ? "Processing Document..." : "Upload & Process with AI"}
+        </CFButton>
+      </CFCard>
     </div>
   );
 }
 
-function Row({ label, value }) {
+function ReviewRow({ label, value }) {
   return (
-    <div className="flex gap-4">
-      <span className="font-medium text-muted-foreground w-32 shrink-0">{label}</span>
-      <span className="text-foreground">{value}</span>
+    <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4 p-4 hover:bg-[var(--card)] transition-colors">
+      <span className="font-semibold text-xs text-[var(--text-secondary)] uppercase tracking-wider w-32 shrink-0 sm:pt-0.5">{label}</span>
+      <div className="text-sm text-[var(--text-primary)]">{value}</div>
     </div>
   );
 }
