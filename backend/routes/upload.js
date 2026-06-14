@@ -43,6 +43,9 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
     const { batchId, targetType, targetBatchId } = req.body;
     if (!batchId) return fail(res, 'batchId is required', 400);
 
+    const resolvedBatchId = (batchId && batchId !== 'personal') ? batchId : null;
+    const resolvedTargetBatchId = (targetBatchId && targetBatchId !== 'personal') ? targetBatchId : null;
+
     // Upload to S3
     const fileUrl = await uploadToS3(req.file.buffer, req.file.originalname, req.file.mimetype);
 
@@ -335,8 +338,11 @@ router.post('/text', verifyFirebaseToken, async (req, res) => {
     if (!batchId) return fail(res, 'batchId is required', 400);
     if (!text || !text.trim()) return fail(res, 'text is required', 400);
 
+    const resolvedBatchId = (batchId && batchId !== 'personal') ? batchId : null;
+    const resolvedTargetBatchId = (targetBatchId && targetBatchId !== 'personal') ? targetBatchId : null;
+
     // Determine routing batchId: prefer targetBatchId when available and not 'personal'
-    const routingBatchId = (targetBatchId && targetBatchId !== 'personal') ? targetBatchId : batchId;
+    const routingBatchId = resolvedTargetBatchId ? resolvedTargetBatchId : resolvedBatchId;
 
     // ── Route through DocumentIntelligenceRouter pipeline ──
     try {
