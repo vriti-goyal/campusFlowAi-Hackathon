@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const examScheduleSchema = new mongoose.Schema(
   {
-    batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Batch', required: true },
+    batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Batch', required: false, default: null },
     courseCode: { type: String, required: true },
     courseName: { type: String, default: '' },
     examDate: { type: Date, required: true },

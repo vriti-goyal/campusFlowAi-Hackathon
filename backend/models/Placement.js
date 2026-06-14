@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const placementSchema = new mongoose.Schema(
   {
-    batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Batch' },
+    batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Batch', required: false, default: null },
     postId: { type: mongoose.Schema.Types.ObjectId, ref: 'Post', default: null },
     company: { type: String, required: true },
     role: { type: String, default: '' },

@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const assignmentSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Batch' },
+    batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Batch', required: false, default: null },
     postId: { type: mongoose.Schema.Types.ObjectId, ref: 'Post', default: null },
     title: { type: String, required: true },
     subject: { type: String, default: '' },

@@ -61,7 +61,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
     // ── Timetable detected ──
     if (docType === 'timetable' && targetBatchId && targetBatchId !== 'personal') {
       // Verify admin access
-      const membership = await BatchMember.findOne({ batchId: targetBatchId, userId: req.user._id });
+      const membership = await BatchMember.findOne({ batchId: resolvedTargetBatchId, userId: req.user._id });
       if (!membership || !['owner', 'moderator'].includes(membership.role)) {
         return fail(res, 'Only batch owners or moderators can upload timetables. This PDF looks like a timetable.', 403);
       }
@@ -93,7 +93,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
         const slots = dayMap[day];
         if (slots && slots.length > 0) {
           await Timetable.findOneAndUpdate(
-            { batchId: targetBatchId, dayOfWeek: day },
+            { batchId: resolvedTargetBatchId, dayOfWeek: day },
             { slots, uploadedBy: req.user._id },
             { upsert: true, new: true }
           );
@@ -114,7 +114,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
 
     // ── Timetable Update detected ──
     if (docType === 'timetable_update' && targetBatchId && targetBatchId !== 'personal') {
-      const membership = await BatchMember.findOne({ batchId: targetBatchId, userId: req.user._id });
+      const membership = await BatchMember.findOne({ batchId: resolvedTargetBatchId, userId: req.user._id });
       if (!membership || !['owner', 'moderator'].includes(membership.role)) {
         return fail(res, 'Only batch owners or moderators can upload timetable updates.', 403);
       }
@@ -127,7 +127,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
       let processedUpdates = 0;
       for (const update of updates) {
         // Find matching timetable slot for the course
-        const timetables = await Timetable.find({ batchId: targetBatchId });
+        const timetables = await Timetable.find({ batchId: resolvedTargetBatchId });
         let targetSlot = null;
         let targetDayOfWeek = '';
 
@@ -148,12 +148,12 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
             targetSlot.faculty = update.new_details?.faculty || targetSlot.faculty;
             
             await Timetable.updateOne(
-              { batchId: targetBatchId, dayOfWeek: targetDayOfWeek, 'slots._id': targetSlot._id },
+              { batchId: resolvedTargetBatchId, dayOfWeek: targetDayOfWeek, 'slots._id': targetSlot._id },
               { $set: { 'slots.$': targetSlot } }
             );
 
             await TimetableLog.create({
-              batchId: targetBatchId,
+              batchId: resolvedTargetBatchId,
               adminName: 'AI Notice Detector',
               changeType: 'permanent',
               reason: update.reason || 'Notice Upload',
@@ -162,7 +162,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
           } else {
             // Temporary Override
             await TimetableOverride.create({
-              batchId: targetBatchId,
+              batchId: resolvedTargetBatchId,
               originalSlotId: targetSlot._id,
               date: update.date,
               overrideType: update.override_type,
@@ -173,7 +173,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
             });
 
             await TimetableLog.create({
-              batchId: targetBatchId,
+              batchId: resolvedTargetBatchId,
               adminName: 'AI Notice Detector',
               changeType: 'temporary',
               reason: update.reason || 'Notice Upload',
@@ -182,10 +182,10 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
           }
 
           // Trigger Notification to enrolled members
-          const members = await BatchMember.find({ batchId: targetBatchId, role: 'student' });
+          const members = await BatchMember.find({ batchId: resolvedTargetBatchId, role: 'student' });
           const notifications = members.map(m => ({
             userId: m.userId,
-            batchId: targetBatchId,
+            batchId: resolvedTargetBatchId,
             title: `Class ${update.override_type.toUpperCase()}`,
             message: `${update.course_code} has been ${update.override_type.replace('_', ' ')} for ${update.date}.`,
             type: 'announcement'
@@ -209,7 +209,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
 
     // ── Exam Schedule detected ──
     if (docType === 'exam_schedule' && targetBatchId && targetBatchId !== 'personal') {
-      const membership = await BatchMember.findOne({ batchId: targetBatchId, userId: req.user._id });
+      const membership = await BatchMember.findOne({ batchId: resolvedTargetBatchId, userId: req.user._id });
       if (!membership || !['owner', 'moderator'].includes(membership.role)) {
         return fail(res, 'Only batch owners or moderators can upload exam schedules. This PDF looks like an exam schedule.', 403);
       }
@@ -229,7 +229,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
         if (isNaN(examDate.getTime())) continue;
 
         entries.push({
-          batchId: targetBatchId,
+          batchId: resolvedTargetBatchId,
           courseCode: courseCode.toUpperCase(),
           courseName: row.course_name?.trim() || '',
           examDate,
@@ -244,7 +244,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
         return fail(res, 'AI detected an exam schedule but entries had invalid dates. Try a clearer PDF.', 400);
       }
 
-      await ExamSchedule.deleteMany({ batchId: targetBatchId });
+      await ExamSchedule.deleteMany({ batchId: resolvedTargetBatchId });
       await ExamSchedule.insertMany(entries);
 
       return ok(res, {
@@ -293,13 +293,13 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
     }
 
     // ── General document fallback (existing pipeline) ──
-    const extraction = await processUpload(fileUrl, batchId, req.user.uid, extractedText);
+    const extraction = await processUpload(fileUrl, resolvedBatchId, req.user.uid, extractedText);
 
     const resolvedTargetType = targetType === 'personal' ? 'personal' : 'batch';
     const resolvedTargetBatchId = resolvedTargetType === 'batch' && targetBatchId ? targetBatchId : null;
 
     const post = await Post.create({
-      batchId,
+      batchId: resolvedBatchId,
       uploadedBy: req.user._id,
       type: extraction.extractedType || 'general',
       title: extraction.title,
@@ -313,7 +313,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
       verificationStatus: 'unverified',
       isDuplicate: false,
       targetType: resolvedTargetType,
-      targetBatchId: resolvedTargetBatchId,
+      targetBatchId: finalTargetBatchId,
     });
 
     return ok(res, { post, extraction }, 201);
@@ -365,13 +365,13 @@ router.post('/text', verifyFirebaseToken, async (req, res) => {
     }
 
     // ── General document fallback (existing pipeline) ──
-    const extraction = await processUpload(null, batchId, req.user.uid, text);
+    const extraction = await processUpload(null, resolvedBatchId, req.user.uid, text);
 
     const resolvedTargetType = targetType === 'personal' ? 'personal' : 'batch';
-    const resolvedTargetBatchId = resolvedTargetType === 'batch' && targetBatchId ? targetBatchId : null;
+    const finalTargetBatchId = resolvedTargetType === 'batch' && resolvedTargetBatchId ? resolvedTargetBatchId : null;
 
     const post = await Post.create({
-      batchId,
+      batchId: resolvedBatchId,
       uploadedBy: req.user._id,
       type: extraction.extractedType || 'general',
       title: extraction.title,
@@ -385,7 +385,7 @@ router.post('/text', verifyFirebaseToken, async (req, res) => {
       verificationStatus: 'unverified',
       isDuplicate: false,
       targetType: resolvedTargetType,
-      targetBatchId: resolvedTargetBatchId,
+      targetBatchId: finalTargetBatchId,
     });
 
     return ok(res, { post, extraction }, 201);
