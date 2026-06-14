@@ -217,24 +217,24 @@ export default function PlacementsPage() {
 
       {/* Gmail Banner */}
       {!gmail.connected ? (
-        <CFCard className="border-amber-200 bg-amber-50 dark:bg-amber-900/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <CFCard className="border-amber-200 bg-amber-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Mail className="text-amber-500 shrink-0" size={24} />
             <div>
-              <h3 className="font-semibold text-amber-900 dark:text-amber-200">Connect Gmail to auto-scan placement emails</h3>
-              <p className="text-sm text-amber-700 dark:text-amber-400">CampusFlow AI will scan your inbox for TNP and placement emails automatically</p>
+              <h3 className="font-semibold text-amber-900">Connect Gmail to auto-scan placement emails</h3>
+              <p className="text-sm text-amber-700">CampusFlow AI will scan your inbox for TNP and placement emails automatically</p>
             </div>
           </div>
           <CFButton variant="primary" onClick={gmail.connect} className="shrink-0">Connect Gmail</CFButton>
         </CFCard>
       ) : (
-        <CFCard className="border-green-200 bg-green-50 dark:bg-green-900/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <CFCard className="border-green-200 bg-green-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <CheckCircle2 className="text-green-500 shrink-0" size={24} />
             <div>
-              <h3 className="font-semibold text-green-900 dark:text-green-200">Gmail Connected</h3>
-              <p className="text-sm text-green-700 dark:text-green-400">{gmail.email}</p>
-              {gmail.lastSync && <p className="text-xs text-green-600/70 dark:text-green-500/70">Last synced: {new Date(gmail.lastSync).toLocaleString()}</p>}
+              <h3 className="font-semibold text-green-900">Gmail Connected</h3>
+              <p className="text-sm text-green-700">{gmail.email}</p>
+              {gmail.lastSync && <p className="text-xs text-green-600/70">Last synced: {new Date(gmail.lastSync).toLocaleString()}</p>}
             </div>
           </div>
           <CFButton variant="secondary" size="sm" onClick={handleSync} disabled={gmail.syncing} className="shrink-0 gap-2">
@@ -296,7 +296,7 @@ export default function PlacementsPage() {
             <select 
               value={sortOption} 
               onChange={(e) => setSortOption(e.target.value)}
-              className="bg-[var(--card)] border border-[var(--border)] text-[var(--text-primary)] text-sm rounded-lg focus:ring-[#6A68DF] focus:border-[#6A68DF] block p-2"
+              className="bg-[var(--card)] border border-[var(--border)] text-[var(--text-primary)] text-sm rounded-xl focus:ring-[#6A68DF] focus:border-[#6A68DF] block p-2"
             >
               <option>Deadline ↑</option>
               <option>Priority ↓</option>
@@ -411,11 +411,11 @@ function PlacementCard({ placement: p, onApply, onDismiss, onRemind, applying, u
             {p.source === 'gmail' ? '📧 Gmail' : '📄 Upload'}
           </CFBadge>
           {p.priorityScore >= 85 ? (
-             <CFBadge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-[10px] px-1.5 py-0 border-0">High</CFBadge>
+             <CFBadge className="bg-red-100 text-red-700 text-[10px] px-1.5 py-0 border-0">High</CFBadge>
           ) : p.priorityScore >= 50 ? (
-             <CFBadge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-[10px] px-1.5 py-0 border-0">Medium</CFBadge>
+             <CFBadge className="bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0 border-0">Medium</CFBadge>
           ) : (
-             <CFBadge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-[10px] px-1.5 py-0 border-0">Low</CFBadge>
+             <CFBadge className="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0 border-0">Low</CFBadge>
           )}
         </div>
       </div>
@@ -459,18 +459,18 @@ function PlacementCard({ placement: p, onApply, onDismiss, onRemind, applying, u
       </div>
 
       {/* DEADLINE ROW */}
-      <div className="flex items-center justify-between mt-auto bg-[var(--card-elevated)] p-2 rounded-lg mb-3">
+      <div className="flex items-center justify-between mt-auto bg-[var(--card-elevated)] p-2 rounded-2xl mb-3">
         <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]">
           <Clock size={16} /> 
           {p.deadline ? new Date(p.deadline).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'No deadline'}
         </div>
         {p.deadline && !isApplied && (
           <div className={cn(
-            "text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1",
-            isMissed ? "bg-gray-100 text-gray-500 dark:bg-gray-800" :
-            daysLeft <= 3 ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400" :
-            daysLeft <= 7 ? "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400" :
-            "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+            "text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1",
+            isMissed ? "bg-gray-100 text-gray-500" :
+            daysLeft <= 3 ? "bg-red-100 text-red-600" :
+            daysLeft <= 7 ? "bg-amber-100 text-amber-600" :
+            "bg-green-100 text-green-600"
           )}>
             {isMissed ? "Deadline passed" : `${daysLeft} days left`}
             {!isMissed && daysLeft <= 3 && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse ml-1" />}
@@ -484,7 +484,7 @@ function PlacementCard({ placement: p, onApply, onDismiss, onRemind, applying, u
       <div className="flex flex-wrap gap-2">
         {isApplied ? (
           <>
-            <CFBadge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0 py-1.5 px-3 font-semibold text-xs flex items-center gap-1">
+            <CFBadge className="bg-green-100 text-green-700 border-0 py-1.5 px-3 font-semibold text-xs flex items-center gap-1">
               <CheckCircle2 size={14}/> Applied
             </CFBadge>
             <CFButton variant="ghost" size="sm" className="ml-auto text-xs py-1.5">View Details</CFButton>
@@ -495,7 +495,7 @@ function PlacementCard({ placement: p, onApply, onDismiss, onRemind, applying, u
             <CFButton variant="ghost" size="sm" className="ml-auto text-xs py-1.5" onClick={() => onDismiss(p._id)}>Dismiss</CFButton>
           </>
         ) : isMissed ? (
-          <CFBadge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-0 py-1.5 px-3 font-semibold text-xs flex items-center gap-1">
+          <CFBadge className="bg-red-100 text-red-700 border-0 py-1.5 px-3 font-semibold text-xs flex items-center gap-1">
              Missed
           </CFBadge>
         ) : (
