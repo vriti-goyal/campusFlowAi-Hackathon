@@ -299,7 +299,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
     const extraction = await processUpload(fileUrl, resolvedBatchId, req.user.uid, extractedText);
 
     const resolvedTargetType = targetType === 'personal' ? 'personal' : 'batch';
-    const resolvedTargetBatchId = resolvedTargetType === 'batch' && targetBatchId ? targetBatchId : null;
+    const finalTargetBatchId = resolvedTargetType === 'batch' && resolvedTargetBatchId ? resolvedTargetBatchId : null;
 
     const post = await Post.create({
       batchId: resolvedBatchId,
