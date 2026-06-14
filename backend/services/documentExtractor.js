@@ -1,257 +1,308 @@
-/**
- * documentExtractor.js
- *
- * Shared AI service that takes raw text (extracted from PDF via Textract)
- * and uses Bedrock to parse it into structured timetable or exam schedule data.
- */
 import { invokeAI } from '../config/gemini.js';
 
-// ── Helpers ─────────────────────────────────────────────────
+// ── Document Type Detection ──────────────────────────────────────────
 
-function parseLLMJSON(raw) {
-  let cleaned = raw.trim();
-  cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
-  cleaned = cleaned.trim();
+/**
+ * detectDocumentType — keyword-based fast classification
+ * Returns: 'timetable' | 'timetable_update' | 'exam_schedule' |
+ *          'assignment' | 'placement' | 'general'
+ */
+export function detectDocumentType(text) {
+  const lower = text.toLowerCase();
 
-  try {
-    return JSON.parse(cleaned);
-  } catch (e) {
-    // Try to find a JSON array or object in the response
-    const arrMatch = cleaned.match(/\[[\s\S]*\]/);
-    const objMatch = cleaned.match(/\{[\s\S]*\}/);
-    if (arrMatch) {
-      try { return JSON.parse(arrMatch[0]); } catch {}
-    }
-    if (objMatch) {
-      try { return JSON.parse(objMatch[0]); } catch {}
-    }
-    console.error('[DocumentExtractor] JSON parse failed:', e.message, 'Raw (first 500):', raw.slice(0, 500));
-    return null;
+  // Timetable update keywords (check before timetable)
+  const timetableUpdateKeywords = [
+    'class cancelled', 'class suspended', 'rescheduled', 'extra class',
+    'makeup class', 'postponed', 'class shifted', 'venue change',
+    'time change', 'faculty change', 'holiday notice', 'no class'
+  ];
+  if (timetableUpdateKeywords.some(k => lower.includes(k))) {
+    return 'timetable_update';
   }
+
+  // Timetable keywords
+  const timetableKeywords = [
+    'timetable', 'time table', 'class schedule', 'lecture schedule',
+    'weekly schedule', 'course schedule', 'monday', 'tuesday',
+    'wednesday', 'thursday', 'friday', 'slot', 'period'
+  ];
+  const timetableScore = timetableKeywords.filter(k => lower.includes(k)).length;
+
+  // Exam schedule keywords
+  const examKeywords = [
+    'exam', 'examination', 'end term', 'mid term', 'midterm', 'end-term',
+    'internal assessment', 'test schedule', 'date sheet', 'hall ticket',
+    'seating arrangement', 'exam schedule', 'exam date'
+  ];
+  const examScore = examKeywords.filter(k => lower.includes(k)).length;
+
+  // Assignment keywords
+  const assignmentKeywords = [
+    'assignment', 'submit', 'submission', 'homework', 'lab record',
+    'project submission', 'report submission', 'due date', 'upload on',
+    'submit on', 'submit before', 'deadline'
+  ];
+  const assignmentScore = assignmentKeywords.filter(k => lower.includes(k)).length;
+
+  // Placement keywords
+  const placementKeywords = [
+    'placement', 'hiring', 'recruitment', 'campus drive', 'job offer',
+    'package', 'ctc', 'lpa', 'stipend', 'internship', 'company',
+    'cgpa criteria', 'eligible branches', 'apply now', 'registration link'
+  ];
+  const placementScore = placementKeywords.filter(k => lower.includes(k)).length;
+
+  // Return highest scoring category
+  const scores = {
+    timetable: timetableScore,
+    exam_schedule: examScore,
+    assignment: assignmentScore,
+    placement: placementScore,
+  };
+
+  const maxScore = Math.max(...Object.values(scores));
+  if (maxScore === 0) return 'general';
+
+  // Require minimum 2 keyword matches to confidently classify
+  if (maxScore < 2) return 'general';
+
+  return Object.keys(scores).find(k => scores[k] === maxScore);
 }
 
-// ── Timetable Extraction ────────────────────────────────────
+// ── Timetable Extraction ─────────────────────────────────────────────
 
-const TIMETABLE_PROMPT = (text) => `You are an AI assistant for a college management system.
-
-The following text was extracted from a TIMETABLE PDF document (class schedule).
-Extract the weekly class schedule from it.
+export async function extractTimetableFromText(text) {
+  const prompt = `You are extracting a weekly class timetable from text.
 
 TEXT:
 """
-${text.slice(0, 6000)}
+${text.slice(0, 3000)}
 """
 
-Return ONLY valid JSON. No explanation. Use this exact schema:
+Return ONLY a valid JSON array of class slots. No markdown, no explanation.
+Each slot must have these exact fields:
 [
   {
     "day": "Monday",
-    "time": "09:00 AM",
-    "course_code": "CSE301",
-    "course_name": "Database Management",
-    "venue": "Room 101",
-    "faculty": "Dr. Sharma",
+    "time": "9:00 AM - 10:00 AM",
+    "course_code": "CS301",
+    "course_name": "Data Structures",
+    "venue": "Room 204",
+    "faculty": "Dr. Smith",
     "class_type": "Theory"
   }
 ]
 
 Rules:
-- "day" must be one of: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday
-- "time" should be in human-readable format like "09:00 AM" or "9:00-10:00"
-- "course_code" is required — if not in text, create from subject abbreviation (e.g. "MATH" for Mathematics)
-- "course_name" is the full subject/course name
-- "venue" is the room/hall if mentioned, empty string if not
-- "faculty" is the professor/teacher name if mentioned, empty string if not
+- "day" must be full day name: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday
+- "time" should be a time range string
+- "course_code" and "course_name" are required — if course code is missing use a short abbreviation from the name
+- "venue" and "faculty" can be empty string if not mentioned
 - "class_type" must be one of: Theory, Lab, Tutorial, Other. Default to Theory if unsure.
-- Include ALL slots you can find in the text
-- Return an empty array [] if you cannot identify any timetable entries`;
+- Include ALL class slots found — do not skip any
+- If the same course appears multiple times in a week, include each occurrence as a separate slot
+- Return [] if no valid timetable data found`;
 
-/**
- * Extract timetable slots from raw text using AI.
- * @param {string} text - Raw text extracted from PDF
- * @returns {Promise<Array>} Array of { day, time, course_code, course_name, venue, faculty }
- */
-export async function extractTimetableFromText(text) {
-  console.log('[DocumentExtractor] Extracting timetable from text, length:', text.length);
-
-  const response = await invokeAI(TIMETABLE_PROMPT(text), 2048);
-  const parsed = parseLLMJSON(response);
-
-  if (!parsed || !Array.isArray(parsed)) {
-    console.error('[DocumentExtractor] Timetable extraction returned invalid data');
+  try {
+    const response = await invokeAI(prompt, 2048);
+    return parseJSONArray(response);
+  } catch (err) {
+    console.error('[Extractor] Timetable extraction failed:', err.message);
     return [];
   }
-
-  // Normalize and validate
-  const validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  return parsed
-    .filter(r => r.day && r.time && r.course_code)
-    .map(r => ({
-      day: validDays.find(d => d.toLowerCase() === r.day.toLowerCase()) || r.day,
-      time: r.time.trim(),
-      course_code: r.course_code.trim().toUpperCase(),
-      course_name: r.course_name?.trim() || '',
-      venue: r.venue?.trim() || '',
-      faculty: r.faculty?.trim() || '',
-      classType: r.class_type?.trim() || 'Theory',
-    }));
 }
 
-// ── Exam Schedule Extraction ────────────────────────────────
+// ── Exam Schedule Extraction ─────────────────────────────────────────
 
-const EXAM_SCHEDULE_PROMPT = (text) => `You are an AI assistant for a college management system.
-
-The following text was extracted from an EXAM SCHEDULE PDF document.
-Extract the exam schedule from it.
+export async function extractExamScheduleFromText(text) {
+  const prompt = `You are extracting an exam schedule from text.
 
 TEXT:
 """
-${text.slice(0, 6000)}
+${text.slice(0, 3000)}
 """
 
-Return ONLY valid JSON. No explanation. Use this exact schema:
+Return ONLY a valid JSON array of exam entries. No markdown, no explanation.
+Each entry must have these exact fields:
 [
   {
-    "course_code": "CSE301",
-    "course_name": "Database Management",
-    "exam_date": "2026-07-15",
+    "course_code": "CS301",
+    "course_name": "Data Structures",
+    "exam_date": "2024-06-20",
     "exam_time": "10:00 AM",
     "venue": "Hall A"
   }
 ]
 
 Rules:
-- "course_code" is required — if not in text, create from subject abbreviation
-- "course_name" is the full subject name
-- "exam_date" MUST be in YYYY-MM-DD format. If year is not mentioned, use 2026
-- "exam_time" in human-readable format, empty string if not mentioned
-- "venue" is the room/hall, empty string if not mentioned
-- Include ALL exams you can find in the text
-- Return an empty array [] if you cannot identify any exam entries`;
+- "exam_date" must be in YYYY-MM-DD format — convert any date format to this
+- "course_code" is required — derive from course name if not explicitly shown
+- "exam_time" and "venue" can be empty string if not mentioned
+- Include ALL exams found in the schedule
+- Return [] if no valid exam schedule data found`;
 
-/**
- * Extract exam schedule entries from raw text using AI.
- * @param {string} text - Raw text extracted from PDF
- * @returns {Promise<Array>} Array of { course_code, course_name, exam_date, exam_time, venue }
- */
-export async function extractExamScheduleFromText(text) {
-  console.log('[DocumentExtractor] Extracting exam schedule from text, length:', text.length);
-
-  const response = await invokeAI(EXAM_SCHEDULE_PROMPT(text), 2048);
-  const parsed = parseLLMJSON(response);
-
-  if (!parsed || !Array.isArray(parsed)) {
-    console.error('[DocumentExtractor] Exam schedule extraction returned invalid data');
+  try {
+    const response = await invokeAI(prompt, 2048);
+    return parseJSONArray(response);
+  } catch (err) {
+    console.error('[Extractor] Exam schedule extraction failed:', err.message);
     return [];
   }
-
-  // Validate and normalize
-  return parsed
-    .filter(r => r.course_code && r.exam_date)
-    .map(r => ({
-      course_code: r.course_code.trim().toUpperCase(),
-      course_name: r.course_name?.trim() || '',
-      exam_date: r.exam_date.trim(),
-      exam_time: r.exam_time?.trim() || '',
-      venue: r.venue?.trim() || '',
-    }));
 }
 
-// ── Auto-detect document type ───────────────────────────────
+// ── Timetable Update Extraction ──────────────────────────────────────
 
-/**
- * Detect if text is a timetable, exam schedule, or general notice.
- * Uses keyword heuristics (no AI call needed).
- * @param {string} text
- * @returns {'timetable' | 'exam_schedule' | 'general'}
- */
-export function detectDocumentType(text) {
-  const lower = text.toLowerCase();
-
-  // Timetable Update indicators
-  const updateKeywords = ['class cancelled', 'class reschedule', 'room change', 'faculty change', 'postponed', 'preponed', 'class suspended', 'timetable change'];
-  if (updateKeywords.some(k => lower.includes(k))) return 'timetable_update';
-
-  // Timetable indicators
-  const ttKeywords = ['timetable', 'time table', 'class schedule', 'weekly schedule', 'period', 'lecture schedule'];
-  const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-  const hasTTKeyword = ttKeywords.some(k => lower.includes(k));
-  const dayCount = dayNames.filter(d => lower.includes(d)).length;
-
-  // Exam schedule indicators
-  const examKeywords = ['exam schedule', 'examination schedule', 'date sheet', 'datesheet', 'exam timetable', 'end term', 'end-term', 'mid term', 'mid-term', 'semester exam'];
-  const hasExamKeyword = examKeywords.some(k => lower.includes(k));
-
-  if (hasExamKeyword) return 'exam_schedule';
-  if (hasTTKeyword || dayCount >= 3) return 'timetable';
-
-  return 'general';
-}
-
-// ── Timetable Update Extraction ─────────────────────────────
-
-const TIMETABLE_UPDATE_PROMPT = (text) => `You are an AI assistant for a college management system.
-
-The following text was extracted from a notice document regarding class schedule updates.
-Extract the details of the timetable change.
+export async function extractTimetableUpdateFromText(text) {
+  const prompt = `You are extracting timetable change notices from text.
 
 TEXT:
 """
-${text.slice(0, 6000)}
+${text.slice(0, 2000)}
 """
 
-Return ONLY valid JSON as an array. No explanation. Use this exact schema:
+Return ONLY a valid JSON array of timetable changes. No markdown, no explanation.
 [
   {
-    "course_code": "CSE301",
-    "course_name": "Database Management",
-    "date": "2026-06-15",
-    "original_time": "09:00 AM",
-    "change_type": "temporary", 
+    "course_code": "CS301",
+    "change_type": "temporary",
     "override_type": "cancelled",
+    "date": "2024-06-15",
+    "reason": "Faculty on leave",
     "new_details": {
       "time": "",
       "venue": "",
       "faculty": ""
-    },
-    "reason": "Faculty on leave"
+    }
   }
 ]
 
 Rules:
-- "course_code" is required.
-- "date" MUST be in YYYY-MM-DD format (infer year/month if missing, assume current year is 2026).
-- "change_type" must be either "temporary" (applies to a single date) or "permanent" (applies to all future dates). If unsure, default to "temporary".
-- "override_type" must be one of: "rescheduled", "cancelled", "room_changed", "faculty_changed".
-- "new_details" should contain updated info if applicable (e.g., new time for reschedule, new venue for room_changed). Leave empty string if not applicable.
-- "reason" is the justification provided in the text.
-- Include ALL updates you can find in the text. Return [] if none.`;
+- "change_type": "temporary" for one-time changes, "permanent" for permanent changes
+- "override_type": one of "cancelled", "rescheduled", "venue_change", "faculty_change", "extra_class"
+- "date": YYYY-MM-DD format
+- "new_details": fill only the fields that are changing, leave others as empty string
+- Return [] if no timetable change information found`;
 
-export async function extractTimetableUpdateFromText(text) {
-  console.log('[DocumentExtractor] Extracting timetable update from text, length:', text.length);
-
-  const response = await invokeAI(TIMETABLE_UPDATE_PROMPT(text), 2048);
-  const parsed = parseLLMJSON(response);
-
-  if (!parsed || !Array.isArray(parsed)) {
-    console.error('[DocumentExtractor] Timetable update extraction returned invalid data');
+  try {
+    const response = await invokeAI(prompt, 1024);
+    return parseJSONArray(response);
+  } catch (err) {
+    console.error('[Extractor] Timetable update extraction failed:', err.message);
     return [];
   }
+}
 
-  return parsed
-    .filter(r => r.course_code && r.date && r.override_type)
-    .map(r => ({
-      course_code: r.course_code.trim().toUpperCase(),
-      course_name: r.course_name?.trim() || '',
-      date: r.date.trim(),
-      original_time: r.original_time?.trim() || '',
-      change_type: ['temporary', 'permanent'].includes(r.change_type) ? r.change_type : 'temporary',
-      override_type: r.override_type,
-      new_details: {
-        time: r.new_details?.time?.trim() || '',
-        venue: r.new_details?.venue?.trim() || '',
-        faculty: r.new_details?.faculty?.trim() || '',
-      },
-      reason: r.reason?.trim() || ''
-    }));
+// ── Assignment Extraction ────────────────────────────────────────────
+
+export async function extractAssignmentFromText(text) {
+  const prompt = `You are extracting assignment details from a college notice.
+
+TEXT:
+"""
+${text.slice(0, 2000)}
+"""
+
+Return ONLY valid JSON. No markdown, no explanation.
+{
+  "title": "Assignment title",
+  "subject": "Subject/Course name",
+  "course_code": "CS301",
+  "deadline": "2024-06-20T17:00:00.000Z",
+  "submission_mode": "ERP Portal / Email / Physical",
+  "description": "Brief description of what needs to be submitted",
+  "action_required": "What the student must do"
+}
+
+Rules:
+- "deadline" must be ISO 8601 format. If only date given, assume 11:59 PM.
+- If deadline is not mentioned, set to null
+- "submission_mode" can be empty string if not mentioned
+- Be specific and actionable in "action_required"`;
+
+  try {
+    const response = await invokeAI(prompt, 512);
+    return parseJSONObject(response);
+  } catch (err) {
+    console.error('[Extractor] Assignment extraction failed:', err.message);
+    return null;
+  }
+}
+
+// ── Placement Extraction ─────────────────────────────────────────────
+
+export async function extractPlacementFromText(text) {
+  const prompt = `You are extracting placement/job opportunity details from a college notice.
+
+TEXT:
+"""
+${text.slice(0, 2000)}
+"""
+
+Return ONLY valid JSON. No markdown, no explanation.
+{
+  "company": "Company name",
+  "role": "Job role/position",
+  "package": "7 LPA",
+  "eligible_branches": ["CSE", "IT", "ECE"],
+  "minimum_cgpa": 7.0,
+  "allowed_backlogs": 0,
+  "deadline": "2024-06-20T23:59:00.000Z",
+  "test_date": "2024-06-25T10:00:00.000Z",
+  "application_link": "https://...",
+  "action_required": "Register before the deadline"
+}
+
+Rules:
+- "eligible_branches": array of branch abbreviations, empty array if all branches eligible
+- "minimum_cgpa": number, 0 if not mentioned
+- "allowed_backlogs": integer, 0 if not mentioned
+- "deadline" and "test_date": ISO 8601 or null if not mentioned
+- "application_link": URL string or empty string`;
+
+  try {
+    const response = await invokeAI(prompt, 512);
+    return parseJSONObject(response);
+  } catch (err) {
+    console.error('[Extractor] Placement extraction failed:', err.message);
+    return null;
+  }
+}
+
+// ── JSON Helpers ─────────────────────────────────────────────────────
+
+function stripFences(raw) {
+  return raw
+    .trim()
+    .replace(/^```(?:json)?\s*\n?/i, '')
+    .replace(/\n?```\s*$/i, '')
+    .trim();
+}
+
+function parseJSONArray(raw) {
+  try {
+    const cleaned = stripFences(raw);
+    const parsed = JSON.parse(cleaned);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    // Try to extract array from mixed text
+    const match = raw.match(/\[[\s\S]*\]/);
+    if (match) {
+      try { return JSON.parse(match[0]); } catch { return []; }
+    }
+    return [];
+  }
+}
+
+function parseJSONObject(raw) {
+  try {
+    const cleaned = stripFences(raw);
+    const parsed = JSON.parse(cleaned);
+    return typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (match) {
+      try { return JSON.parse(match[0]); } catch { return null; }
+    }
+    return null;
+  }
 }

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, FileText, CheckCircle, XCircle, Loader2, Layers, ChevronDown, CalendarDays, BookOpen, Sparkles, AlertCircle } from 'lucide-react';
+import { Upload, FileText, CheckCircle, XCircle, Loader2, Layers, ChevronDown, CalendarDays, BookOpen, Sparkles, AlertCircle, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import api from '@/lib/api';
 import { CFButton, CFCard, CFBadge, CFSkeleton } from '@/components/ui';
 import { cn } from '@/lib/utils';
@@ -49,6 +50,7 @@ function BatchSelector({ batches, value, onChange, loadingBatches }) {
 }
 
 export default function UploadPage() {
+  const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const [mode, setMode] = useState('file'); // 'file' | 'text'
   const [file, setFile] = useState(null);
@@ -169,6 +171,32 @@ export default function UploadPage() {
   if (result?.autoDetected) {
     const isExam = result.autoDetected === 'exam_schedule';
     const Icon = isExam ? BookOpen : CalendarDays;
+    
+    let actionLabel = 'View Community';
+    let actionPath = '/community';
+    switch (result.autoDetected) {
+      case 'assignment':
+        actionLabel = 'View Assignments';
+        actionPath = '/dashboard/assignments';
+        break;
+      case 'placement':
+        actionLabel = 'View Placements';
+        actionPath = '/dashboard/placements';
+        break;
+      case 'timetable':
+      case 'timetable_update':
+        actionLabel = 'View Timetable';
+        actionPath = '/dashboard/timetable';
+        break;
+      case 'exam_schedule':
+        actionLabel = 'View Exams';
+        actionPath = '/dashboard/exams';
+        break;
+      default:
+        actionLabel = 'View Community';
+        actionPath = '/dashboard/community';
+    }
+
     return (
       <div className="max-w-2xl mx-auto pb-10">
         <CFCard gradient className="text-center p-8 space-y-6">
@@ -181,13 +209,18 @@ export default function UploadPage() {
           <p className="text-white/90 text-sm font-medium">{result.message}</p>
           
           <div className="bg-black/10 rounded-xl p-4 inline-block text-left space-y-2">
-            {result.totalSlots && <p className="text-sm text-white/90 font-medium">✅ {result.totalSlots} slots across {result.updatedDays} days saved to timetable</p>}
-            {result.inserted && <p className="text-sm text-white/90 font-medium">✅ {result.inserted} exam entries saved to schedule</p>}
+            {result.totalSlots !== undefined && <p className="text-sm text-white/90 font-medium">✅ {result.totalSlots} slots across {result.updatedDays} days saved to timetable</p>}
+            {result.inserted !== undefined && <p className="text-sm text-white/90 font-medium">✅ {result.inserted} exam entries saved to schedule</p>}
+            {result.routing?.assignment?.status === 'success' && <p className="text-sm text-white/90 font-medium">✅ Assignment entry created</p>}
+            {result.routing?.placement?.status === 'success' && <p className="text-sm text-white/90 font-medium">✅ Placement entry created</p>}
           </div>
           
-          <div>
-            <CFButton variant="secondary" onClick={resetAll} className="mt-4 px-8">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center mt-4">
+            <CFButton variant="secondary" onClick={resetAll} className="px-8">
               Upload Another
+            </CFButton>
+            <CFButton onClick={() => navigate(actionPath)} icon={ArrowRight} className="px-8 bg-white text-[#6A68DF] border-none hover:bg-gray-50">
+              {actionLabel}
             </CFButton>
           </div>
         </CFCard>
