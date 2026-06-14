@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   AlertCircle, Target, Sparkles, ArrowRight, X, UserCircle2, 
-  ClipboardList, BookOpen, Briefcase, CalendarDays, CheckCircle 
+  ClipboardList, BookOpen, Briefcase, CalendarDays, CheckCircle, Users 
 } from 'lucide-react';
 import api from '@/lib/api';
 import { Link } from 'react-router-dom';

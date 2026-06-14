@@ -16,7 +16,7 @@ import calendarRoutes from './routes/calendarRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
-import gmailRoutes from './routes/gmailRoutes.js';
+import gmailRoutes from './routes/gmail.js';
 import placementNoticeRoutes from './routes/placementNoticeRoutes.js';
 import examScheduleRoutes from './routes/examScheduleRoutes.js';
 import timetableRoutes from './routes/timetableRoutes.js';

@@ -16,6 +16,8 @@ const placementSchema = new mongoose.Schema(
     priorityScore: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true },
     status: { type: String, enum: ['upcoming', 'active', 'closed'], default: 'active' },
+    source: { type: String, default: 'manual' },
+    sourceId: { type: String, default: null },
   },
   { timestamps: true }
 );
