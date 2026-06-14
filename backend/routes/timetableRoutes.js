@@ -4,7 +4,7 @@ import { verifyFirebaseToken } from '../middleware/auth.js';
 import { Timetable } from '../models/Timetable.js';
 import { BatchMember } from '../models/BatchMember.js';
 import { uploadToS3 } from '../config/s3.js';
-import { extractTextFromFile } from '../config/textract.js';
+import { invokeAIVision } from '../config/gemini.js';
 import { extractTimetableFromText } from '../services/documentExtractor.js';
 import { ok, fail } from '../utils/response.js';
 
@@ -118,11 +118,11 @@ router.post('/upload', verifyFirebaseToken, fileUpload.single('file'), async (re
       // ── PDF/Image path: S3 → Textract → AI ──
       console.log('[Timetable] PDF/image upload detected, running AI extraction...');
 
-      // Upload to S3 for Textract
+      // Upload to S3
       const fileUrl = await uploadToS3(req.file.buffer, req.file.originalname, req.file.mimetype);
 
-      // Extract text via Textract
-      const extractedText = await extractTextFromFile(fileUrl);
+      // Extract text via Gemini Vision
+      const extractedText = await invokeAIVision(req.file.buffer, req.file.mimetype);
       if (!extractedText || !extractedText.trim()) {
         return fail(res, 'Could not extract text from the uploaded file. Try a clearer image/PDF.', 400);
       }
