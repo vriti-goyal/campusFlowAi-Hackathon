@@ -2,7 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { verifyFirebaseToken } from '../middleware/auth.js';
 import { uploadToS3 } from '../config/s3.js';
-import { invokeAIVision } from '../config/gemini.js';
+import { extractTextFromBuffer } from '../utils/extractText.js';
 import { processUpload } from '../services/aiPipeline.js';
 import { routeDocument } from '../services/documentRouter.js';
 import { detectDocumentType, extractTimetableFromText, extractExamScheduleFromText, extractTimetableUpdateFromText } from '../services/documentExtractor.js';
@@ -49,7 +49,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
     // Extract text via Gemini Vision for document classification
     let extractedText = '';
     try {
-      extractedText = await invokeAIVision(req.file.buffer, req.file.mimetype);
+      extractedText = await extractTextFromBuffer(req.file.buffer, req.file.mimetype);
     } catch (err) {
       console.error('[Upload] Vision extraction failed:', err.message);
     }
