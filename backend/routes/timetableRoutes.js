@@ -5,6 +5,7 @@ import { Timetable } from '../models/Timetable.js';
 import { TimetableOverride } from '../models/TimetableOverride.js';
 import { TimetableLog } from '../models/TimetableLog.js';
 import { BatchMember } from '../models/BatchMember.js';
+import { Notification } from '../models/Notification.js';
 import { uploadToS3 } from '../config/s3.js';
 import { extractTextFromBuffer } from '../utils/extractText.js';
 import { extractTimetableFromText } from '../services/documentExtractor.js';
@@ -62,6 +63,7 @@ function buildDayMap(rows) {
       courseName: (row.course_name || row.courseName || '').trim(),
       venue: row.venue?.trim() || '',
       faculty: row.faculty?.trim() || '',
+      classType: row.classType?.trim() || 'Theory',
     });
   }
 
@@ -101,10 +103,7 @@ router.post('/upload', verifyFirebaseToken, fileUpload.single('file'), async (re
     const { batchId } = req.body;
     if (!batchId) return fail(res, 'batchId is required', 400);
 
-    const membership = await BatchMember.findOne({ batchId, userId: req.user._id });
-    if (!membership || !['owner', 'moderator'].includes(membership.role)) {
-      return fail(res, 'Only batch owners or moderators can upload timetables', 403);
-    }
+    await requireOwner(batchId, req.user._id);
 
     const isCSV = req.file.mimetype === 'text/csv' || req.file.originalname.endsWith('.csv');
     let rows;
@@ -224,12 +223,45 @@ router.get('/batch/:batchId', verifyFirebaseToken, async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/timetable/batch/:batchId
+ * Clear the entire timetable for a batch (Super Admin only)
+ */
+router.delete('/batch/:batchId', verifyFirebaseToken, async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    await requireOwner(batchId, req.user._id);
+
+    await Timetable.deleteMany({ batchId });
+    await TimetableOverride.deleteMany({ batchId });
+
+    await TimetableLog.create({
+      batchId,
+      adminName: req.user.name || 'Admin',
+      changeType: 'deletion',
+      reason: 'Batch Timetable Cleared',
+      description: 'The entire timetable was deleted by the owner.'
+    });
+
+    return ok(res, { message: 'Timetable cleared successfully' });
+  } catch (err) {
+    return fail(res, err.message, err.message.includes('Unauthorized') ? 403 : 500);
+  }
+});
+
 // ── Admin Timetable Management (CRUD) ──
 
-async function requireAdmin(batchId, userId) {
+async function requireOwner(batchId, userId) {
+  const membership = await BatchMember.findOne({ batchId, userId });
+  if (!membership || membership.role !== 'owner') {
+    throw new Error('Unauthorized. Only batch owners can manage permanent timetable schedules.');
+  }
+}
+
+async function requireModerator(batchId, userId) {
   const membership = await BatchMember.findOne({ batchId, userId });
   if (!membership || !['owner', 'moderator'].includes(membership.role)) {
-    throw new Error('Unauthorized. Only batch owners or moderators can manage timetable.');
+    throw new Error('Unauthorized. Only batch owners or moderators can apply temporary overrides.');
   }
 }
 
@@ -238,15 +270,15 @@ async function requireAdmin(batchId, userId) {
  */
 router.post('/slot', verifyFirebaseToken, async (req, res) => {
   try {
-    const { batchId, dayOfWeek, time, courseCode, courseName, venue, faculty, reason } = req.body;
-    await requireAdmin(batchId, req.user._id);
+    const { batchId, dayOfWeek, time, courseCode, courseName, venue, faculty, classType, reason } = req.body;
+    await requireOwner(batchId, req.user._id);
 
     let timetable = await Timetable.findOne({ batchId, dayOfWeek });
     if (!timetable) {
       timetable = new Timetable({ batchId, dayOfWeek, slots: [], uploadedBy: req.user._id });
     }
 
-    timetable.slots.push({ time, courseCode, courseName, venue, faculty });
+    timetable.slots.push({ time, courseCode, courseName, venue, faculty, classType: classType || 'Theory' });
     await timetable.save();
 
     await TimetableLog.create({
@@ -269,8 +301,8 @@ router.post('/slot', verifyFirebaseToken, async (req, res) => {
 router.put('/slot/:slotId', verifyFirebaseToken, async (req, res) => {
   try {
     const { slotId } = req.params;
-    const { batchId, time, courseCode, courseName, venue, faculty, reason } = req.body;
-    await requireAdmin(batchId, req.user._id);
+    const { batchId, time, courseCode, courseName, venue, faculty, classType, reason } = req.body;
+    await requireOwner(batchId, req.user._id);
 
     const timetable = await Timetable.findOne({ batchId, 'slots._id': slotId });
     if (!timetable) return fail(res, 'Slot not found', 404);
@@ -283,6 +315,7 @@ router.put('/slot/:slotId', verifyFirebaseToken, async (req, res) => {
     slot.courseName = courseName !== undefined ? courseName : slot.courseName;
     slot.venue = venue !== undefined ? venue : slot.venue;
     slot.faculty = faculty !== undefined ? faculty : slot.faculty;
+    slot.classType = classType !== undefined ? classType : slot.classType;
     
     await timetable.save();
 
@@ -307,7 +340,7 @@ router.delete('/slot/:slotId', verifyFirebaseToken, async (req, res) => {
   try {
     const { slotId } = req.params;
     const { batchId, reason } = req.body;
-    await requireAdmin(batchId, req.user._id);
+    await requireOwner(batchId, req.user._id);
 
     const timetable = await Timetable.findOne({ batchId, 'slots._id': slotId });
     if (!timetable) return fail(res, 'Slot not found', 404);
@@ -339,7 +372,7 @@ router.delete('/slot/:slotId', verifyFirebaseToken, async (req, res) => {
 router.post('/override', verifyFirebaseToken, async (req, res) => {
   try {
     const { batchId, originalSlotId, date, overrideType, newDetails, reason } = req.body;
-    await requireAdmin(batchId, req.user._id);
+    await requireModerator(batchId, req.user._id);
 
     const override = await TimetableOverride.create({
       batchId,
@@ -358,6 +391,19 @@ router.post('/override', verifyFirebaseToken, async (req, res) => {
       reason: reason || '',
       description: `Applied ${overrideType} override for slot ${originalSlotId} on ${date}`
     });
+
+    // Notify all students in the batch
+    const students = await BatchMember.find({ batchId, role: 'student' }).select('userId');
+    if (students.length > 0) {
+      const studentIds = students.map(s => s.userId);
+      await Notification.insertMany(studentIds.map(userId => ({
+        userId,
+        title: 'Timetable Update',
+        message: `A timetable slot on ${date} has been ${overrideType.replace('_', ' ')}. Check your timetable for details.`,
+        type: 'timetable_update',
+        link: '/dashboard/timetable'
+      })));
+    }
 
     return ok(res, { message: 'Override applied', override });
   } catch (err) {

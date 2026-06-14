@@ -50,7 +50,8 @@ Return ONLY valid JSON. No explanation. Use this exact schema:
     "course_code": "CSE301",
     "course_name": "Database Management",
     "venue": "Room 101",
-    "faculty": "Dr. Sharma"
+    "faculty": "Dr. Sharma",
+    "class_type": "Theory"
   }
 ]
 
@@ -61,6 +62,7 @@ Rules:
 - "course_name" is the full subject/course name
 - "venue" is the room/hall if mentioned, empty string if not
 - "faculty" is the professor/teacher name if mentioned, empty string if not
+- "class_type" must be one of: Theory, Lab, Tutorial, Other. Default to Theory if unsure.
 - Include ALL slots you can find in the text
 - Return an empty array [] if you cannot identify any timetable entries`;
 
@@ -91,6 +93,7 @@ export async function extractTimetableFromText(text) {
       course_name: r.course_name?.trim() || '',
       venue: r.venue?.trim() || '',
       faculty: r.faculty?.trim() || '',
+      classType: r.class_type?.trim() || 'Theory',
     }));
 }
 

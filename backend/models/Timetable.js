@@ -6,6 +6,7 @@ const timetableSlotSchema = new mongoose.Schema({
   courseName: { type: String, default: '' },
   venue: { type: String, default: '' },
   faculty: { type: String, default: '' },
+  classType: { type: String, enum: ['Theory', 'Lab', 'Tutorial', 'Other'], default: 'Theory' }
 });
 
 const timetableSchema = new mongoose.Schema(
