@@ -1,8 +1,8 @@
-import pdfParse from 'pdf-parse/lib/pdf-parse.js';
-
 export async function extractTextFromBuffer(buffer, mimetype) {
   try {
     if (mimetype === 'application/pdf') {
+      const pdfParseModule = await import('pdf-parse');
+      const pdfParse = pdfParseModule.default || pdfParseModule;
       const data = await pdfParse(buffer);
       const text = data.text?.trim();
       if (!text || text.length < 50) {
