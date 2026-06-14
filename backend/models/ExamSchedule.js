@@ -8,6 +8,11 @@ const examScheduleSchema = new mongoose.Schema(
     examDate: { type: Date, required: true },
     examTime: { type: String, default: '' },
     venue: { type: String, default: '' },
+    examType: {
+      type: String,
+      enum: ['Mid Semester', 'End Semester', 'Quiz', 'Practical', 'Viva', 'Other'],
+      default: 'Other',
+    },
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     uploadedAt: { type: Date, default: Date.now },
   },

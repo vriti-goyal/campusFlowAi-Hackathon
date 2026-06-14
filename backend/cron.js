@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { Assignment } from './models/Assignment.js';
 import { Exam } from './models/Exam.js';
 import { Notification } from './models/Notification.js';
+import { processReminders } from './services/reminderEngine.js';
 
 export function startCronJobs() {
   // Run every 6 hours (0 0,6,12,18 * * *)
@@ -63,6 +64,17 @@ export function startCronJobs() {
       console.log(`[Cron] Generated reminders: ${urgentAssignments.length} assignments, ${upcomingExams.length} exams.`);
     } catch (err) {
       console.error('[Cron] Error running scheduled jobs:', err);
+    }
+  });
+
+  // Process due reminders every 5 minutes
+  cron.schedule('*/5 * * * *', async () => {
+    console.log('[Cron] Processing due reminders...');
+    try {
+      const result = await processReminders();
+      console.log(`[Cron] Reminders processed: ${result.processed} sent, ${result.failed} failed.`);
+    } catch (err) {
+      console.error('[Cron] Reminder processing failed:', err.message);
     }
   });
 
