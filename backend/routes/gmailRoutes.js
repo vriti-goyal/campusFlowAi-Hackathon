@@ -128,11 +128,20 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
 
     const gmail = google.gmail({ version: 'v1', auth: oAuth2Client });
 
+    let query = 'newer_than:30d';
+    if (user.tnpEmail) {
+      const emails = user.tnpEmail.split(',').map(e => e.trim()).filter(Boolean);
+      if (emails.length > 0) {
+        const fromQuery = emails.map(e => `from:${e}`).join(' OR ');
+        query += ` (${fromQuery})`;
+      }
+    }
+
     // Fetch last 50 messages
     const listResponse = await gmail.users.messages.list({
       userId: 'me',
       maxResults: 50,
-      q: 'newer_than:30d', // Last 30 days
+      q: query,
     });
 
     const messages = listResponse.data.messages || [];
