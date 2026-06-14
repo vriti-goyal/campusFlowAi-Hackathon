@@ -20,6 +20,7 @@ import gmailRoutes from './routes/gmailRoutes.js';
 import placementNoticeRoutes from './routes/placementNoticeRoutes.js';
 import examScheduleRoutes from './routes/examScheduleRoutes.js';
 import timetableRoutes from './routes/timetableRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 import { startCronJobs } from './cron.js';
 
 const app = express();
@@ -54,6 +55,7 @@ app.use('/api/gmail', gmailRoutes);
 app.use('/api/placement-notices', placementNoticeRoutes);
 app.use('/api/exam-schedule', examScheduleRoutes);
 app.use('/api/timetable', timetableRoutes);
+app.use('/api/admin', adminRoutes);
 
 // ── 404 catch-all ───────────────────────────────────────────
 app.use((req, res) => {
