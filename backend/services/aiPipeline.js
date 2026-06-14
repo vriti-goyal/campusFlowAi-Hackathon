@@ -1,4 +1,3 @@
-import { extractTextFromFile } from '../config/textract.js';
 import { invokeAI } from '../config/gemini.js';
 import { calculatePriorityScore } from './priorityScore.js';
 import { Post } from '../models/Post.js';
@@ -172,23 +171,7 @@ async function checkDuplicate(batchId, category, title) {
  * @returns {object} extraction result
  */
 export async function processUpload(fileUrl, batchId, uploadedBy, rawText = null) {
-  let extractedText;
-
-  // Step 1: Get text
-  if (fileUrl) {
-    console.log('[AI Pipeline] Extracting text from file via Textract...');
-    try {
-      extractedText = await extractTextFromFile(fileUrl);
-      console.log('[AI Pipeline] Textract result length:', extractedText.length);
-    } catch (err) {
-      console.error('[AI Pipeline] Textract failed:', err.message);
-      throw new Error(`Text extraction failed: ${err.message}`);
-    }
-  } else if (rawText) {
-    extractedText = rawText;
-  } else {
-    throw new Error('No file URL or text provided');
-  }
+  let extractedText = rawText;
 
   if (!extractedText || !extractedText.trim()) {
     throw new Error('No text could be extracted from the document');

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { verifyFirebaseToken } from '../middleware/auth.js';
 import { uploadToS3 } from '../config/s3.js';
-import { extractTextFromFile } from '../config/textract.js';
+import { invokeAIVision } from '../config/gemini.js';
 import { processUpload } from '../services/aiPipeline.js';
 import { detectDocumentType, extractTimetableFromText, extractExamScheduleFromText } from '../services/documentExtractor.js';
 import { Post } from '../models/Post.js';
@@ -42,12 +42,12 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
     // Upload to S3
     const fileUrl = await uploadToS3(req.file.buffer, req.file.originalname, req.file.mimetype);
 
-    // Extract text via Textract for document type detection
+    // Extract text via Gemini Vision for document type detection
     let extractedText = '';
     try {
-      extractedText = await extractTextFromFile(fileUrl);
+      extractedText = await invokeAIVision(req.file.buffer, req.file.mimetype);
     } catch (err) {
-      console.error('[Upload] Textract failed:', err.message);
+      console.error('[Upload] Vision extraction failed:', err.message);
     }
 
     // ── Auto-detect document type ──
@@ -157,7 +157,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
     }
 
     // ── General document (existing pipeline) ──
-    const extraction = await processUpload(fileUrl, batchId, req.user.uid);
+    const extraction = await processUpload(fileUrl, batchId, req.user.uid, extractedText);
 
     const resolvedTargetType = targetType === 'personal' ? 'personal' : 'batch';
     const resolvedTargetBatchId = resolvedTargetType === 'batch' && targetBatchId ? targetBatchId : null;
