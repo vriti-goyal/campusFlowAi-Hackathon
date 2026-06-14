@@ -81,6 +81,7 @@ export default function TimetablePage() {
   const [batches, setBatches] = useState([]);
   const [selectedBatch, setSelectedBatch] = useState('all');
   const [activeDay, setActiveDay] = useState(DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]);
+  const [timetables, setTimetables] = useState([]);
   const [overrides, setOverrides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);

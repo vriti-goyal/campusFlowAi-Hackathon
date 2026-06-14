@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 import {
@@ -123,6 +123,7 @@ function NotificationBell() {
 export default function AppLayout() {
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
+  const location = useLocation();
 
   useEffect(() => {
     const handleResize = () => {
@@ -221,6 +222,17 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Floating AI Assistant Button */}
+      {location.pathname !== '/assistant' && (
+        <Link 
+          to="/assistant" 
+          className="fixed bottom-8 right-8 bg-[#6A68DF] text-white p-4 rounded-full shadow-2xl hover:bg-[#5b59c4] hover:scale-110 transition-all duration-300 z-50 group flex items-center justify-center"
+          title="CampusFlow AI Assistant"
+        >
+          <Bot size={28} className="group-hover:animate-pulse" />
+        </Link>
+      )}
     </div>
   );
 }

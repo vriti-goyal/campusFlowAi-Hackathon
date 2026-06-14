@@ -269,6 +269,27 @@ export default function PlacementNoticesPage() {
   const [statusLoading, setStatusLoading] = useState(true);
   const [syncMsg, setSyncMsg] = useState(null);
   const [filter, setFilter] = useState('all');
+  const [tnpEmails, setTnpEmails] = useState('');
+  const [savingEmails, setSavingEmails] = useState(false);
+
+  useEffect(() => {
+    if (dbUser?.tnpEmail) {
+      setTnpEmails(dbUser.tnpEmail);
+    }
+  }, [dbUser]);
+
+  const handleSaveEmails = async () => {
+    setSavingEmails(true);
+    setSyncMsg(null);
+    try {
+      await api.patch('/api/users/me', { tnpEmail: tnpEmails });
+      setSyncMsg({ type: 'success', text: '✅ Sender email filters saved!' });
+    } catch {
+      setSyncMsg({ type: 'error', text: '❌ Failed to save sender emails.' });
+    } finally {
+      setSavingEmails(false);
+    }
+  };
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -428,6 +449,32 @@ export default function PlacementNoticesPage() {
           )}
         </div>
       </div>
+
+      {/* Sender Email Filter Config */}
+      {!statusLoading && gmailStatus.connected && (
+        <div className="p-4 rounded-xl border border-white/10 bg-white/[0.02] space-y-3">
+          <label className="block text-sm font-medium text-white/80">
+            Fetch from specific sender emails (comma-separated)
+          </label>
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              value={tnpEmails}
+              onChange={(e) => setTnpEmails(e.target.value)}
+              placeholder="e.g. placements@college.edu, tnp@university.edu"
+              className="flex-1 px-4 py-2 rounded-xl bg-background border border-border focus:border-violet-500 outline-none text-sm"
+            />
+            <button
+              onClick={handleSaveEmails}
+              disabled={savingEmails}
+              className="px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground text-sm font-medium transition-all disabled:opacity-50"
+            >
+              {savingEmails ? 'Saving...' : 'Save Filters'}
+            </button>
+          </div>
+          <p className="text-xs text-white/40">If left blank, all emails in your inbox will be scanned for placement notices.</p>
+        </div>
+      )}
 
       {/* Status message */}
       {syncMsg && (

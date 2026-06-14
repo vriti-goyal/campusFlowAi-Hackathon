@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ClipboardList, Clock, AlertTriangle, CheckCircle2, Play, Bell, Info } from 'lucide-react';
+import { ClipboardList, Clock, AlertTriangle, CheckCircle2, Play, Bell, Info, Upload } from 'lucide-react';
 import api from '@/lib/api';
 import { CFButton, CFCard, CFBadge, CFSkeleton, CFEmptyState } from '@/components/ui';
 import { cn } from '@/lib/utils';
@@ -83,9 +83,18 @@ export default function AssignmentsPage() {
 
   return (
     <div className="space-y-8 pb-10">
-      <div>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Assignment Hub</h1>
-        <p className="text-[var(--text-secondary)] text-sm mt-1">Track and manage your assignments</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
+            <ClipboardList className="text-[#6A68DF]" size={24} /> Assignment Hub
+          </h1>
+          <p className="text-[var(--text-secondary)] text-sm mt-1">Track and manage your assignments</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <CFButton variant="secondary" size="sm" onClick={() => window.location.href='/upload'} icon={Upload}>
+            Upload Notice
+          </CFButton>
+        </div>
       </div>
 
       {/* Status Tabs */}
