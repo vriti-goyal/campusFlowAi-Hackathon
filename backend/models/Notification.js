@@ -7,7 +7,9 @@ const notificationSchema = new mongoose.Schema(
     message: { type: String, required: true },
     type: { type: String, enum: ['assignment', 'exam', 'placement', 'community', 'system'], default: 'system' },
     priority: { type: String, enum: ['low', 'medium', 'high', 'urgent'], default: 'low' },
-    isRead: { type: Boolean, default: false }
+    isRead: { type: Boolean, default: false },
+    reminderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Reminder', default: null },
+    batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Batch', default: null }
   },
   { timestamps: true }
 );

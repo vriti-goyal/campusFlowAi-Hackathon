@@ -18,6 +18,8 @@ const timetableSchema = new mongoose.Schema(
     },
     slots: [timetableSlotSchema],
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    lastPermanentUpdateAt: { type: Date, default: null },
+    lastPermanentUpdateBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   },
   { timestamps: true }
 );
