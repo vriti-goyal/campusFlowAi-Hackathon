@@ -7,7 +7,7 @@ import ToastContainer from '@/components/Toast';
 import Spinner from '@/components/Spinner';
 
 // Layout
-import AppLayout from './components/layout/AppLayout';
+import DashboardLayout from './layouts/DashboardLayout';
 
 // Pages
 import LoginPage from './pages/Login';
@@ -61,7 +61,7 @@ export default function App() {
               path="/"
               element={
                 <PrivateRoute>
-                  <AppLayout />
+                  <DashboardLayout />
                 </PrivateRoute>
               }
             >

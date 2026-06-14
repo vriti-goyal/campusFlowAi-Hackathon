@@ -1,31 +1,26 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
-import {
-  BookOpen, MapPin, Clock, Loader2, BookMarked, Upload,
-  Calendar, AlertTriangle, CheckCircle, RefreshCw, FileText,
-  ChevronDown, X, Shield
-} from 'lucide-react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { BookOpen, MapPin, Clock, Upload, Calendar as CalendarIcon, AlertTriangle, RefreshCw, FileText, X, Shield } from 'lucide-react';
 import api from '@/lib/api';
+import { CFButton, CFCard, CFBadge, CFSkeleton, CFEmptyState } from '@/components/ui';
+import { cn } from '@/lib/utils';
 
 // ── Days-left badge ───────────────────────────────────────────────────────────
-function DaysBadge({ date }) {
-  const daysLeft = Math.ceil((new Date(date) - new Date()) / 86400000);
-  if (daysLeft < 0) return (
-    <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">Passed</span>
-  );
-  return (
-    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-      daysLeft === 0 ? 'bg-red-500 text-white animate-pulse' :
-      daysLeft <= 3  ? 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400' :
-      daysLeft <= 7  ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400' :
-                       'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
-    }`}>
-      {daysLeft === 0 ? '🔥 Today!' : `${daysLeft}d left`}
-    </span>
-  );
+function getDaysLeftText(daysLeft) {
+  if (daysLeft < 0) return "Passed";
+  if (daysLeft === 0) return "🔥 Today!";
+  if (daysLeft === 1) return "Tomorrow";
+  return `${daysLeft} days left`;
+}
+
+function getDaysLeftVariant(daysLeft) {
+  if (daysLeft < 0) return 'missed';
+  if (daysLeft === 0) return 'high';
+  if (daysLeft <= 3) return 'medium';
+  return 'default';
 }
 
 // ── CSV Upload Panel (owner/moderator only) ───────────────────────────────────
-function CSVUploadPanel({ batches, onUploaded }) {
+function CSVUploadPanel({ batches, onUploaded, onClose }) {
   const fileRef = useRef(null);
   const [selectedBatch, setSelectedBatch] = useState('');
   const [file, setFile] = useState(null);
@@ -59,40 +54,43 @@ function CSVUploadPanel({ batches, onUploaded }) {
   };
 
   return (
-    <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-      <div className="flex items-center gap-2">
-        <Shield size={16} className="text-primary" />
-        <h3 className="font-semibold text-foreground text-sm">Upload Exam Schedule (Admin)</h3>
+    <CFCard className="space-y-4 mb-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Shield size={18} className="text-[#6A68DF]" />
+          <h3 className="font-semibold text-[var(--text-primary)]">Upload Exam Schedule (Admin)</h3>
+        </div>
+        <CFButton variant="ghost" size="sm" onClick={onClose} icon={X} className="px-2 py-2" />
       </div>
 
-      <p className="text-xs text-muted-foreground">
+      <p className="text-sm text-[var(--text-secondary)]">
         Upload a <strong>PDF/Image</strong> and AI will extract the schedule, or use a <strong>CSV</strong> with columns:{' '}
-        <code className="bg-secondary px-1 rounded">course_code</code>,{' '}
-        <code className="bg-secondary px-1 rounded">course_name</code>,{' '}
-        <code className="bg-secondary px-1 rounded">exam_date</code>,{' '}
-        <code className="bg-secondary px-1 rounded">exam_time</code>,{' '}
-        <code className="bg-secondary px-1 rounded">venue</code>
+        <code className="bg-[var(--bg)] px-1.5 py-0.5 rounded text-[11px] font-mono border border-[var(--border)]">course_code</code>,{' '}
+        <code className="bg-[var(--bg)] px-1.5 py-0.5 rounded text-[11px] font-mono border border-[var(--border)]">course_name</code>,{' '}
+        <code className="bg-[var(--bg)] px-1.5 py-0.5 rounded text-[11px] font-mono border border-[var(--border)]">exam_date</code>,{' '}
+        <code className="bg-[var(--bg)] px-1.5 py-0.5 rounded text-[11px] font-mono border border-[var(--border)]">exam_time</code>,{' '}
+        <code className="bg-[var(--bg)] px-1.5 py-0.5 rounded text-[11px] font-mono border border-[var(--border)]">venue</code>
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
         <div>
-          <label className="text-xs font-medium text-foreground mb-1 block">Batch</label>
+          <label className="text-sm font-medium text-[var(--text-primary)] mb-1.5 block">Batch</label>
           <select value={selectedBatch} onChange={e => setSelectedBatch(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground focus:border-primary outline-none appearance-none">
+            className="w-full px-4 py-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] text-[var(--text-primary)] focus:border-[#6A68DF] focus:ring-2 focus:ring-[#6A68DF]/30 outline-none transition-all">
             <option value="">Select batch…</option>
             {adminBatches.map(b => <option key={b._id} value={b._id}>{b.batchName}</option>)}
           </select>
         </div>
         <div>
-          <label className="text-xs font-medium text-foreground mb-1 block">PDF / Image / CSV</label>
+          <label className="text-sm font-medium text-[var(--text-primary)] mb-1.5 block">PDF / Image / CSV</label>
           <div
             onClick={() => fileRef.current?.click()}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border hover:border-primary cursor-pointer transition-colors text-sm text-muted-foreground"
+            className="flex items-center gap-2 px-4 py-3 rounded-2xl border border-dashed border-[#6A68DF]/40 hover:border-[#6A68DF] hover:bg-[#6A68DF]/5 cursor-pointer transition-all text-sm text-[var(--text-secondary)]"
           >
-            <FileText size={14} />
-            {file ? <span className="text-foreground truncate">{file.name}</span> : 'Click to choose file'}
+            <FileText size={18} className="text-[#6A68DF]" />
+            <span className="flex-1 truncate">{file ? file.name : 'Click to choose file'}</span>
             {file && <button type="button" onClick={e => { e.stopPropagation(); setFile(null); }}
-              className="ml-auto text-muted-foreground hover:text-destructive"><X size={12}/></button>}
+              className="ml-auto text-red-400 hover:text-red-500"><X size={16}/></button>}
           </div>
           <input ref={fileRef} type="file" accept=".csv,.pdf,.png,.jpg,.jpeg" className="hidden"
             onChange={e => setFile(e.target.files?.[0] || null)} />
@@ -100,27 +98,27 @@ function CSVUploadPanel({ batches, onUploaded }) {
       </div>
 
       {msg && (
-        <p className={`text-xs px-3 py-2 rounded-lg ${msg.type === 'success' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-destructive/10 text-destructive'}`}>
+        <p className={cn("text-sm px-4 py-2.5 rounded-xl font-medium mt-2", msg.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')}>
           {msg.text}
         </p>
       )}
 
-      <button onClick={handleUpload} disabled={uploading || !selectedBatch || !file}
-        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">
-        {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-        {uploading ? 'Uploading…' : 'Upload Schedule'}
-      </button>
-    </div>
+      <div className="pt-2">
+        <CFButton variant="primary" onClick={handleUpload} disabled={uploading || !selectedBatch || !file} loading={uploading} icon={Upload}>
+          Upload Schedule
+        </CFButton>
+      </div>
+    </CFCard>
   );
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function ExamsPage() {
-  const [scheduleExams, setScheduleExams] = useState([]); // From exam-schedule API
-  const [legacyExams, setLegacyExams] = useState([]);     // From old exams API
+  const [scheduleExams, setScheduleExams] = useState([]);
+  const [legacyExams, setLegacyExams] = useState([]);
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all'); // 'all' | 'upcoming' | 'this-week'
+  const [filter, setFilter] = useState('upcoming');
   const [showUpload, setShowUpload] = useState(false);
 
   const fetchAll = useCallback(async () => {
@@ -133,7 +131,6 @@ export default function ExamsPage() {
       setScheduleExams(schedRes.data.data || []);
       setBatches(batchRes.data || []);
 
-      // Also try the legacy exams API (for manually added exams)
       if (batchRes.data?.length > 0) {
         const legacyRes = await api.get('/api/exams', {
           params: { batchId: batchRes.data[0]._id }
@@ -149,7 +146,6 @@ export default function ExamsPage() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  // Merge both sources and deduplicate by subject+date
   const allExams = [
     ...scheduleExams.map(e => ({
       _id: e._id,
@@ -175,7 +171,7 @@ export default function ExamsPage() {
 
   const filtered = allExams.filter(e => {
     const d = new Date(e.date);
-    if (filter === 'upcoming') return d >= now;
+    if (filter === 'upcoming') return d >= now || Math.ceil((d - now) / 86400000) === 0;
     if (filter === 'this-week') return d >= now && d <= nextWeek;
     return true;
   });
@@ -184,128 +180,141 @@ export default function ExamsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="animate-spin text-primary" size={32} />
+      <div className="space-y-6">
+        <CFSkeleton lines={1} className="w-1/3 h-8" />
+        <div className="flex gap-2">
+          <CFSkeleton lines={1} className="w-24 h-8 rounded-full" />
+          <CFSkeleton lines={1} className="w-24 h-8 rounded-full" />
+        </div>
+        <div className="space-y-4">
+          <CFSkeleton card lines={3} className="h-32" />
+          <CFSkeleton card lines={3} className="h-32" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-5xl pb-10">
+    <div className="space-y-6 max-w-4xl pb-10">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <BookOpen className="text-primary" size={24} /> Exam Hub
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Showing exams filtered to your enrolled course codes
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Exam Hub</h1>
+          <p className="text-[var(--text-secondary)] text-sm mt-1">
+            Timeline of your filtered exam schedule
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={fetchAll}
-            className="p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-            title="Refresh">
-            <RefreshCw size={16} />
-          </button>
+          <CFButton variant="ghost" size="sm" onClick={fetchAll} icon={RefreshCw} className="px-3" />
           {hasAdmin && (
-            <button onClick={() => setShowUpload(s => !s)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors
-                ${showUpload ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary'}`}>
-              <Upload size={15} /> {showUpload ? 'Hide Upload' : 'Upload Schedule'}
-            </button>
+            <CFButton variant={showUpload ? "primary" : "secondary"} size="sm" onClick={() => setShowUpload(s => !s)} icon={Upload}>
+              {showUpload ? 'Hide Upload' : 'Upload Schedule'}
+            </CFButton>
           )}
         </div>
       </div>
 
-      {/* CSV Upload panel (admin/moderator only) */}
-      {showUpload && (
-        <CSVUploadPanel batches={batches} onUploaded={() => { fetchAll(); setShowUpload(false); }} />
-      )}
+      {showUpload && <CSVUploadPanel batches={batches} onUploaded={() => { fetchAll(); setShowUpload(false); }} onClose={() => setShowUpload(false)} />}
 
       {/* No course codes warning */}
       {scheduleExams.length === 0 && batches.some(b => !b.courses?.length) && (
-        <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
-          <AlertTriangle size={16} className="text-amber-400 mt-0.5 shrink-0" />
+        <CFCard className="bg-amber-50 border-amber-200 dark:bg-amber-900/10 dark:border-amber-900 flex items-start gap-3 py-4">
+          <AlertTriangle size={20} className="text-amber-500 shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm text-amber-500 font-medium">No course codes set for your batch</p>
-            <p className="text-xs text-amber-500/70 mt-0.5">
-              Add course codes in <a href="/batch" className="underline hover:text-amber-400">Batch Management</a> to get filtered exam schedules.
+            <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">No course codes set for your batch</p>
+            <p className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-1">
+              Add course codes in <a href="/batch" className="underline font-medium hover:text-amber-500">Batch Management</a> to get filtered exam schedules.
               {hasAdmin && ' Then upload a CSV schedule above.'}
             </p>
           </div>
-        </div>
+        </CFCard>
       )}
 
       {/* Filter tabs */}
       {allExams.length > 0 && (
         <div className="flex gap-2 flex-wrap">
           {[
-            { key: 'all', label: 'All' },
             { key: 'upcoming', label: 'Upcoming' },
             { key: 'this-week', label: 'This Week' },
+            { key: 'all', label: 'All Exams' },
           ].map(({ key, label }) => (
             <button key={key} onClick={() => setFilter(key)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all
-                ${filter === key ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:bg-secondary/70'}`}>
+              className={cn(
+                "px-5 py-2 rounded-full text-sm font-medium transition-all duration-200",
+                filter === key 
+                  ? "bg-[#6A68DF] text-white shadow-md" 
+                  : "bg-[var(--card)] text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg)] hover:text-[var(--text-primary)]"
+              )}>
               {label}
             </button>
           ))}
         </div>
       )}
 
-      {/* Empty state */}
+      {/* Timeline List */}
       {filtered.length === 0 ? (
-        <div className="text-center py-16 space-y-3">
-          <Calendar className="mx-auto text-muted-foreground" size={48} />
-          <h2 className="text-xl font-bold text-foreground">
-            {allExams.length > 0 ? 'No exams match this filter' : 'No Exams Yet'}
-          </h2>
-          <p className="text-muted-foreground text-sm">
-            {allExams.length > 0
-              ? 'Try changing the filter above.'
-              : hasAdmin
-              ? 'Upload an exam schedule CSV above to populate this hub.'
+        <CFEmptyState 
+          icon={CalendarIcon}
+          title={allExams.length > 0 ? 'No exams match this filter' : 'No Exams Yet'}
+          description={allExams.length > 0 
+            ? 'Try changing the filter above.' 
+            : hasAdmin 
+              ? 'Upload an exam schedule to populate this hub.' 
               : 'Your batch admin needs to upload an exam schedule.'}
-          </p>
-        </div>
+        />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((exam) => (
-            <div key={exam._id} className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-3 hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between gap-2">
-                <h3 className="font-semibold text-foreground leading-tight text-sm">{exam.subject}</h3>
-                <DaysBadge date={exam.date} />
-              </div>
+        <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-[#6A68DF]/20 before:to-transparent">
+          {filtered.map((exam, i) => {
+            const daysLeft = Math.ceil((new Date(exam.date) - now) / 86400000);
+            const isToday = daysLeft === 0;
 
-              <div className="space-y-1.5 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <Clock size={13} className="shrink-0" />
-                  <span>{new Date(exam.date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
-                    {exam.time ? ` · ${exam.time}` : ''}</span>
+            return (
+              <div key={exam._id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-[var(--bg)] bg-[#6A68DF]/10 text-[#6A68DF] shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2">
+                  <BookOpen size={16} />
                 </div>
-                {exam.venue && (
-                  <div className="flex items-center gap-2">
-                    <MapPin size={13} className="shrink-0" />
-                    <span>{exam.venue}</span>
+                
+                <CFCard 
+                  className={cn(
+                    "w-[calc(100%-3rem)] md:w-[calc(50%-2.5rem)] p-5 hover:-translate-y-1 transition-transform",
+                    isToday ? "border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-900" : ""
+                  )}
+                  gradient={isToday ? true : false}
+                >
+                  <div className="flex justify-between items-start mb-3 gap-2">
+                    <h3 className={cn("font-semibold text-lg leading-snug", isToday ? "text-white" : "text-[var(--text-primary)]")}>
+                      {exam.subject}
+                    </h3>
+                    <CFBadge variant={isToday ? "default" : getDaysLeftVariant(daysLeft)} className={isToday ? "bg-white/20 text-white" : "whitespace-nowrap"}>
+                      {getDaysLeftText(daysLeft)}
+                    </CFBadge>
                   </div>
-                )}
+
+                  <div className={cn("space-y-2 text-sm font-medium", isToday ? "text-white/90" : "text-[var(--text-secondary)]")}>
+                    <div className="flex items-center gap-2">
+                      <Clock size={16} className="shrink-0" />
+                      <span>{new Date(exam.date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        {exam.time ? ` • ${exam.time}` : ''}</span>
+                    </div>
+                    {exam.venue && (
+                      <div className="flex items-center gap-2">
+                        <MapPin size={16} className="shrink-0" />
+                        <span>{exam.venue}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {exam.courseCode && (
+                    <div className="mt-4 pt-4 border-t border-[var(--border)] border-opacity-30">
+                      <span className={cn("inline-block text-[10px] font-mono px-2 py-0.5 rounded", isToday ? "bg-white/20 text-white" : "bg-[var(--bg)] text-[var(--text-muted)] border border-[var(--border)]")}>
+                        {exam.courseCode}
+                      </span>
+                    </div>
+                  )}
+                </CFCard>
               </div>
-
-              {exam.courseCode && (
-                <span className="inline-block text-[10px] font-mono px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-                  {exam.courseCode}
-                </span>
-              )}
-
-              <button
-                onClick={() => alert('AI study plan feature coming in Phase 3!')}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors w-full justify-center"
-              >
-                <BookMarked size={13} /> Generate Study Plan
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

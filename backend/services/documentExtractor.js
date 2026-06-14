@@ -165,6 +165,10 @@ export async function extractExamScheduleFromText(text) {
 export function detectDocumentType(text) {
   const lower = text.toLowerCase();
 
+  // Timetable Update indicators
+  const updateKeywords = ['class cancelled', 'class reschedule', 'room change', 'faculty change', 'postponed', 'preponed', 'class suspended', 'timetable change'];
+  if (updateKeywords.some(k => lower.includes(k))) return 'timetable_update';
+
   // Timetable indicators
   const ttKeywords = ['timetable', 'time table', 'class schedule', 'weekly schedule', 'period', 'lecture schedule'];
   const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -179,4 +183,72 @@ export function detectDocumentType(text) {
   if (hasTTKeyword || dayCount >= 3) return 'timetable';
 
   return 'general';
+}
+
+// ── Timetable Update Extraction ─────────────────────────────
+
+const TIMETABLE_UPDATE_PROMPT = (text) => `You are an AI assistant for a college management system.
+
+The following text was extracted from a notice document regarding class schedule updates.
+Extract the details of the timetable change.
+
+TEXT:
+"""
+${text.slice(0, 6000)}
+"""
+
+Return ONLY valid JSON as an array. No explanation. Use this exact schema:
+[
+  {
+    "course_code": "CSE301",
+    "course_name": "Database Management",
+    "date": "2026-06-15",
+    "original_time": "09:00 AM",
+    "change_type": "temporary", 
+    "override_type": "cancelled",
+    "new_details": {
+      "time": "",
+      "venue": "",
+      "faculty": ""
+    },
+    "reason": "Faculty on leave"
+  }
+]
+
+Rules:
+- "course_code" is required.
+- "date" MUST be in YYYY-MM-DD format (infer year/month if missing, assume current year is 2026).
+- "change_type" must be either "temporary" (applies to a single date) or "permanent" (applies to all future dates). If unsure, default to "temporary".
+- "override_type" must be one of: "rescheduled", "cancelled", "room_changed", "faculty_changed".
+- "new_details" should contain updated info if applicable (e.g., new time for reschedule, new venue for room_changed). Leave empty string if not applicable.
+- "reason" is the justification provided in the text.
+- Include ALL updates you can find in the text. Return [] if none.`;
+
+export async function extractTimetableUpdateFromText(text) {
+  console.log('[DocumentExtractor] Extracting timetable update from text, length:', text.length);
+
+  const response = await invokeAI(TIMETABLE_UPDATE_PROMPT(text), 2048);
+  const parsed = parseLLMJSON(response);
+
+  if (!parsed || !Array.isArray(parsed)) {
+    console.error('[DocumentExtractor] Timetable update extraction returned invalid data');
+    return [];
+  }
+
+  return parsed
+    .filter(r => r.course_code && r.date && r.override_type)
+    .map(r => ({
+      course_code: r.course_code.trim().toUpperCase(),
+      course_name: r.course_name?.trim() || '',
+      date: r.date.trim(),
+      original_time: r.original_time?.trim() || '',
+      change_type: ['temporary', 'permanent'].includes(r.change_type) ? r.change_type : 'temporary',
+      override_type: r.override_type,
+      new_details: {
+        time: r.new_details?.time?.trim() || '',
+        venue: r.new_details?.venue?.trim() || '',
+        faculty: r.new_details?.faculty?.trim() || '',
+      },
+      reason: r.reason?.trim() || ''
+    }));
 }

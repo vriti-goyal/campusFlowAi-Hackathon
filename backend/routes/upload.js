@@ -4,10 +4,13 @@ import { verifyFirebaseToken } from '../middleware/auth.js';
 import { uploadToS3 } from '../config/s3.js';
 import { invokeAIVision } from '../config/gemini.js';
 import { processUpload } from '../services/aiPipeline.js';
-import { detectDocumentType, extractTimetableFromText, extractExamScheduleFromText } from '../services/documentExtractor.js';
+import { detectDocumentType, extractTimetableFromText, extractExamScheduleFromText, extractTimetableUpdateFromText } from '../services/documentExtractor.js';
 import { Post } from '../models/Post.js';
 import { Timetable } from '../models/Timetable.js';
+import { TimetableOverride } from '../models/TimetableOverride.js';
+import { TimetableLog } from '../models/TimetableLog.js';
 import { ExamSchedule } from '../models/ExamSchedule.js';
+import { Notification } from '../models/Notification.js';
 import { BatchMember } from '../models/BatchMember.js';
 import { ok, fail } from '../utils/response.js';
 
@@ -104,6 +107,101 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
         message: `📅 Timetable detected! Extracted ${totalSlots} class slots across ${updatedDays} days.`,
         updatedDays,
         totalSlots,
+        fileUrl,
+      }, 201);
+    }
+
+    // ── Timetable Update detected ──
+    if (docType === 'timetable_update' && targetBatchId && targetBatchId !== 'personal') {
+      const membership = await BatchMember.findOne({ batchId: targetBatchId, userId: req.user._id });
+      if (!membership || !['owner', 'moderator'].includes(membership.role)) {
+        return fail(res, 'Only batch owners or moderators can upload timetable updates.', 403);
+      }
+
+      const updates = await extractTimetableUpdateFromText(extractedText);
+      if (!updates || updates.length === 0) {
+        return fail(res, 'AI detected a timetable update but could not extract details. Try a clearer PDF.', 400);
+      }
+
+      let processedUpdates = 0;
+      for (const update of updates) {
+        // Find matching timetable slot for the course
+        const timetables = await Timetable.find({ batchId: targetBatchId });
+        let targetSlot = null;
+        let targetDayOfWeek = '';
+
+        for (const tt of timetables) {
+          const slot = tt.slots.find(s => s.courseCode === update.course_code);
+          if (slot) {
+            targetSlot = slot;
+            targetDayOfWeek = tt.dayOfWeek;
+            break;
+          }
+        }
+
+        if (targetSlot) {
+          if (update.change_type === 'permanent') {
+            // Permanent Update
+            targetSlot.time = update.new_details?.time || targetSlot.time;
+            targetSlot.venue = update.new_details?.venue || targetSlot.venue;
+            targetSlot.faculty = update.new_details?.faculty || targetSlot.faculty;
+            
+            await Timetable.updateOne(
+              { batchId: targetBatchId, dayOfWeek: targetDayOfWeek, 'slots._id': targetSlot._id },
+              { $set: { 'slots.$': targetSlot } }
+            );
+
+            await TimetableLog.create({
+              batchId: targetBatchId,
+              adminName: 'AI Notice Detector',
+              changeType: 'permanent',
+              reason: update.reason || 'Notice Upload',
+              description: \`AI Permanent Update for \${update.course_code}: \${update.override_type}\`
+            });
+          } else {
+            // Temporary Override
+            await TimetableOverride.create({
+              batchId: targetBatchId,
+              originalSlotId: targetSlot._id,
+              date: update.date,
+              overrideType: update.override_type,
+              newDetails: update.new_details,
+              reason: update.reason || 'AI extracted from notice',
+              adminName: 'AI Notice Detector',
+              status: 'pending_review' // Flag for admin review
+            });
+
+            await TimetableLog.create({
+              batchId: targetBatchId,
+              adminName: 'AI Notice Detector',
+              changeType: 'temporary',
+              reason: update.reason || 'Notice Upload',
+              description: \`AI Temporary Override for \${update.course_code} on \${update.date}: \${update.override_type}\`
+            });
+          }
+
+          // Trigger Notification to enrolled members
+          const members = await BatchMember.find({ batchId: targetBatchId, role: 'student' });
+          const notifications = members.map(m => ({
+            userId: m.userId,
+            batchId: targetBatchId,
+            title: \`Class \${update.override_type.toUpperCase()}\`,
+            message: \`\${update.course_code} has been \${update.override_type.replace('_', ' ')} for \${update.date}.\`,
+            type: 'announcement'
+          }));
+          
+          if (notifications.length > 0) {
+            await Notification.insertMany(notifications);
+          }
+
+          processedUpdates++;
+        }
+      }
+
+      return ok(res, {
+        autoDetected: 'timetable_update',
+        message: \`🔄 Timetable update detected! Processed \${processedUpdates} modifications.\`,
+        processedUpdates,
         fileUrl,
       }, 201);
     }

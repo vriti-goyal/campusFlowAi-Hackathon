@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Layers, Plus, UserPlus, Loader2, Copy, Trash2, AlertTriangle, X, BookOpen, GripVertical } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Layers, Plus, UserPlus, Loader2, Copy, Trash2, AlertTriangle, X, BookOpen, ChevronRight, Hash } from 'lucide-react';
 import api from '@/lib/api';
+import { CFButton, CFCard, CFBadge, CFInput, CFSkeleton, CFEmptyState } from '@/components/ui';
+import { cn } from '@/lib/utils';
 
 // ── Delete Confirmation Modal ─────────────────────────────────────────────────
 function DeleteBatchModal({ batch, onClose, onDeleted }) {
@@ -26,58 +28,63 @@ function DeleteBatchModal({ batch, onClose, onDeleted }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-      <div className="bg-card border border-border rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <CFCard className="max-w-md w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2 text-red-500">
-            <AlertTriangle size={20} />
-            <h3 className="font-bold text-lg">Delete Batch</h3>
+          <div className="flex items-center gap-3 text-red-500">
+            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+              <AlertTriangle size={20} className="text-red-600" />
+            </div>
+            <h3 className="font-bold text-xl text-[var(--text-primary)]">Delete Batch</h3>
           </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
-            <X size={18} />
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1">
+            <X size={20} />
           </button>
         </div>
 
-        <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-xl p-4">
+        <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900 rounded-xl p-4">
           <p className="text-sm text-red-700 dark:text-red-400 font-medium">
-            Are you sure you want to delete <strong>{batch.batchName}</strong>?
+            Are you sure you want to delete <strong className="font-bold">{batch.batchName}</strong>?
           </p>
-          <p className="text-xs text-red-600 dark:text-red-500 mt-1">
-            This cannot be undone. All associated data will be archived.
+          <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-1.5 font-medium">
+            This action cannot be undone. All associated data, including notices, assignments, and exams, will be permanently archived.
           </p>
         </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">
-            Type <strong className="text-red-500">{batch.batchName}</strong> to confirm:
+        <div className="space-y-2.5">
+          <label className="text-sm font-semibold text-[var(--text-secondary)]">
+            Type <strong className="text-red-500 select-none">{batch.batchName}</strong> to confirm:
           </label>
           <input
             type="text"
             value={confirmName}
             onChange={(e) => { setConfirmName(e.target.value); setError(''); }}
             placeholder={batch.batchName}
-            className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm focus:border-red-400 focus:outline-none"
+            className="w-full px-4 py-2.5 bg-[var(--bg)] border border-[var(--border)] rounded-xl text-sm focus:border-red-400 focus:ring-2 focus:ring-red-400/20 focus:outline-none transition-all text-[var(--text-primary)]"
           />
-          {error && <p className="text-xs text-red-500">{error}</p>}
+          {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
         </div>
 
-        <div className="flex gap-3">
-          <button
+        <div className="flex gap-3 pt-2">
+          <CFButton
+            variant="secondary"
             onClick={onClose}
-            className="flex-1 px-4 py-2 rounded-xl border border-border text-sm text-muted-foreground hover:bg-secondary transition-colors"
+            className="flex-1 py-2.5"
           >
             Cancel
-          </button>
-          <button
+          </CFButton>
+          <CFButton
+            variant="danger"
             onClick={handleDelete}
             disabled={deleting || confirmName !== batch.batchName}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            loading={deleting}
+            icon={Trash2}
+            className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white border-none"
           >
-            {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-            {deleting ? 'Deleting…' : 'Delete Batch'}
-          </button>
+            Delete Batch
+          </CFButton>
         </div>
-      </div>
+      </CFCard>
     </div>
   );
 }
@@ -90,7 +97,6 @@ export default function BatchPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   const [createForm, setCreateForm] = useState({ batchName: '', college: '', branch: '', semester: '' });
-  // Course rows for create form — Feature 4
   const [courseRows, setCourseRows] = useState([{ code: '', name: '', faculty: '' }]);
   const [joinCode, setJoinCode] = useState('');
 
@@ -113,7 +119,6 @@ export default function BatchPage() {
     e.preventDefault();
     setCreating(true);
     try {
-      // Filter out blank course rows before submitting
       const courses = courseRows
         .filter(c => c.code.trim() && c.name.trim())
         .map(c => ({ code: c.code.trim(), name: c.name.trim(), faculty: c.faculty.trim() }));
@@ -153,14 +158,18 @@ export default function BatchPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center p-10">
-        <Loader2 className="animate-spin text-muted-foreground" />
+      <div className="space-y-8">
+        <CFSkeleton lines={1} className="w-1/3 h-8" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <CFSkeleton card lines={6} className="h-96" />
+          <CFSkeleton card lines={3} className="h-48" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 max-w-5xl pb-10">
+    <div className="space-y-10 max-w-6xl pb-12">
       {/* Delete modal */}
       {deleteTarget && (
         <DeleteBatchModal
@@ -170,134 +179,151 @@ export default function BatchPage() {
         />
       )}
 
-      <div className="flex items-center gap-3">
-        <Layers className="text-primary" size={26} />
-        <h2 className="text-2xl font-bold text-foreground">Batch Management</h2>
+      <div>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-3">
+          <Layers className="text-[#6A68DF]" size={28} /> Batch Management
+        </h1>
+        <p className="text-[var(--text-secondary)] text-sm mt-1.5 font-medium">Create or join batches to collaborate with your peers.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         {/* Create Batch Form */}
-        <div className="bg-secondary/30 border border-border rounded-xl p-6">
-          <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-            <Plus size={20} className="text-primary" /> Create New Batch
+        <CFCard className="p-6">
+          <h3 className="text-xl font-bold text-[var(--text-primary)] flex items-center gap-2 mb-6">
+            <Plus size={22} className="text-[#6A68DF]" /> Create New Batch
           </h3>
-          <form onSubmit={handleCreate} className="space-y-4">
+          <form onSubmit={handleCreate} className="space-y-5">
             <div>
-              <label className="text-sm font-medium text-foreground">Batch Name *</label>
-              <input required type="text" value={createForm.batchName} onChange={e => setCreateForm({...createForm, batchName: e.target.value})} className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm mt-1" placeholder="e.g., CS 2024 Section A" />
+              <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5 block">Batch Name <span className="text-[#6A68DF]">*</span></label>
+              <input required type="text" value={createForm.batchName} onChange={e => setCreateForm({...createForm, batchName: e.target.value})} className="w-full px-4 py-2.5 bg-[var(--bg)] border border-[var(--border)] rounded-2xl text-sm focus:outline-none focus:border-[#6A68DF] focus:ring-2 focus:ring-[#6A68DF]/20 transition-all text-[var(--text-primary)]" placeholder="e.g., CS 2024 Section A" />
             </div>
+            
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium text-foreground">College</label>
-                <input type="text" value={createForm.college} onChange={e => setCreateForm({...createForm, college: e.target.value})} className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm mt-1" />
+                <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5 block">College</label>
+                <input type="text" value={createForm.college} onChange={e => setCreateForm({...createForm, college: e.target.value})} className="w-full px-4 py-2.5 bg-[var(--bg)] border border-[var(--border)] rounded-2xl text-sm focus:outline-none focus:border-[#6A68DF] focus:ring-2 focus:ring-[#6A68DF]/20 transition-all text-[var(--text-primary)]" placeholder="Optional" />
               </div>
               <div>
-                <label className="text-sm font-medium text-foreground">Branch</label>
-                <input type="text" value={createForm.branch} onChange={e => setCreateForm({...createForm, branch: e.target.value})} className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm mt-1" />
+                <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5 block">Branch</label>
+                <input type="text" value={createForm.branch} onChange={e => setCreateForm({...createForm, branch: e.target.value})} className="w-full px-4 py-2.5 bg-[var(--bg)] border border-[var(--border)] rounded-2xl text-sm focus:outline-none focus:border-[#6A68DF] focus:ring-2 focus:ring-[#6A68DF]/20 transition-all text-[var(--text-primary)]" placeholder="Optional" />
               </div>
             </div>
+            
             <div>
-              <label className="text-sm font-medium text-foreground">Semester</label>
-              <input type="number" value={createForm.semester} onChange={e => setCreateForm({...createForm, semester: e.target.value})} className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm mt-1" />
+              <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5 block">Semester</label>
+              <input type="number" value={createForm.semester} onChange={e => setCreateForm({...createForm, semester: e.target.value})} className="w-full px-4 py-2.5 bg-[var(--bg)] border border-[var(--border)] rounded-2xl text-sm focus:outline-none focus:border-[#6A68DF] focus:ring-2 focus:ring-[#6A68DF]/20 transition-all text-[var(--text-primary)]" placeholder="Optional" />
             </div>
 
-            {/* ── Course Table — Feature 4 ── */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                  <BookOpen size={14} className="text-primary" /> Courses <span className="text-muted-foreground font-normal">(optional)</span>
+            {/* ── Course Table ── */}
+            <div className="pt-2 border-t border-[var(--border)]">
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-1.5">
+                  <BookOpen size={14} className="text-[#6A68DF]" /> Courses <span className="text-[var(--text-muted)] font-medium lowercase normal-case">(optional)</span>
                 </label>
                 <button type="button"
                   onClick={() => setCourseRows(r => [...r, { code: '', name: '', faculty: '' }])}
-                  className="text-xs text-primary hover:underline flex items-center gap-1">
+                  className="text-xs text-[#6A68DF] font-bold hover:underline flex items-center gap-1 bg-[#6A68DF]/10 px-2 py-1 rounded-full">
                   <Plus size={12} /> Add row
                 </button>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {courseRows.map((row, i) => (
-                  <div key={i} className="flex gap-2 items-center">
+                  <div key={i} className="flex gap-2 items-center bg-[var(--bg)] p-2 rounded-xl border border-[var(--border)] group">
                     <input
                       type="text"
                       value={row.code}
                       onChange={e => setCourseRows(r => r.map((cr, idx) => idx === i ? { ...cr, code: e.target.value.toUpperCase() } : cr))}
                       placeholder="Code*"
-                      className="w-24 px-2 py-1.5 bg-background border border-border rounded text-xs font-mono uppercase focus:border-primary outline-none"
+                      className="w-20 px-2 py-1.5 bg-transparent border-none text-xs font-mono uppercase focus:ring-0 outline-none text-[var(--text-primary)] font-bold placeholder-[var(--text-muted)]"
                     />
+                    <div className="w-px h-6 bg-[var(--border)]"></div>
                     <input
                       type="text"
                       value={row.name}
                       onChange={e => setCourseRows(r => r.map((cr, idx) => idx === i ? { ...cr, name: e.target.value } : cr))}
                       placeholder="Subject Name*"
-                      className="flex-1 px-2 py-1.5 bg-background border border-border rounded text-xs focus:border-primary outline-none"
+                      className="flex-1 px-2 py-1.5 bg-transparent border-none text-xs focus:ring-0 outline-none text-[var(--text-primary)] font-medium placeholder-[var(--text-muted)]"
                     />
+                    <div className="w-px h-6 bg-[var(--border)] hidden sm:block"></div>
                     <input
                       type="text"
                       value={row.faculty}
                       onChange={e => setCourseRows(r => r.map((cr, idx) => idx === i ? { ...cr, faculty: e.target.value } : cr))}
                       placeholder="Faculty"
-                      className="w-28 px-2 py-1.5 bg-background border border-border rounded text-xs focus:border-primary outline-none"
+                      className="w-24 px-2 py-1.5 bg-transparent border-none text-xs focus:ring-0 outline-none text-[var(--text-primary)] font-medium placeholder-[var(--text-muted)] hidden sm:block"
                     />
                     <button type="button" onClick={() => setCourseRows(r => r.filter((_, idx) => idx !== i))}
-                      className="text-muted-foreground hover:text-destructive shrink-0 transition-colors" title="Remove">
+                      className="text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-1.5 rounded-lg shrink-0 transition-all opacity-50 group-hover:opacity-100" title="Remove row">
                       <X size={14} />
                     </button>
                   </div>
                 ))}
               </div>
-              <p className="text-[11px] text-muted-foreground mt-1.5">Course codes are used to filter your exam schedule. e.g. CSE301, MATH201</p>
+              <p className="text-[10px] text-[var(--text-muted)] mt-2 font-medium">Course codes are used to filter your exam schedule automatically (e.g. CSE301, MATH201).</p>
             </div>
 
-            <button disabled={creating} type="submit" className="w-full bg-primary text-primary-foreground py-2 rounded-md font-medium hover:bg-primary/90 flex justify-center items-center gap-2 disabled:opacity-50">
-              {creating ? <Loader2 className="animate-spin" size={18} /> : 'Create Batch'}
-            </button>
+            <CFButton disabled={creating} loading={creating} variant="primary" type="submit" className="w-full py-3 mt-4" icon={Plus}>
+              Create Batch
+            </CFButton>
           </form>
-        </div>
+        </CFCard>
 
         {/* Join Batch Form */}
-        <div className="bg-secondary/30 border border-border rounded-xl p-6 h-fit">
-          <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-            <UserPlus size={20} className="text-primary" /> Join Batch
+        <CFCard className="p-6 h-fit bg-gradient-to-br from-[#6A68DF]/5 to-[#EFB995]/5 border-[#6A68DF]/20">
+          <h3 className="text-xl font-bold text-[var(--text-primary)] flex items-center gap-2 mb-6">
+            <UserPlus size={22} className="text-[#6A68DF]" /> Join Existing Batch
           </h3>
-          <form onSubmit={handleJoin} className="space-y-4">
+          <form onSubmit={handleJoin} className="space-y-5">
             <div>
-              <label className="text-sm font-medium text-foreground">Batch Code *</label>
-              <input required type="text" value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm mt-1 uppercase" placeholder="Enter 8-character code" />
+              <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5 block">Batch Code <span className="text-[#6A68DF]">*</span></label>
+              <div className="relative">
+                <Hash size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+                <input required type="text" value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} className="w-full pl-10 pr-4 py-3 bg-[var(--bg)] border border-[#6A68DF]/30 rounded-2xl text-sm font-mono tracking-widest uppercase focus:outline-none focus:border-[#6A68DF] focus:ring-2 focus:ring-[#6A68DF]/20 transition-all text-[var(--text-primary)]" placeholder="Enter 8-character code" />
+              </div>
             </div>
-            <button disabled={joining} type="submit" className="w-full bg-secondary-foreground text-background py-2 rounded-md font-medium hover:opacity-90 flex justify-center items-center gap-2 disabled:opacity-50">
-              {joining ? <Loader2 className="animate-spin" size={18} /> : 'Join Batch'}
-            </button>
+            <CFButton disabled={joining} loading={joining} variant="primary" type="submit" className="w-full py-3" icon={ChevronRight}>
+              Join Batch
+            </CFButton>
           </form>
-        </div>
+        </CFCard>
       </div>
 
-      <div className="pt-4 border-t border-border">
-        <h3 className="text-xl font-bold text-foreground mb-4">My Batches</h3>
+      <div className="pt-8 border-t border-[var(--border)]">
+        <h3 className="text-xl font-bold text-[var(--text-primary)] mb-6 flex items-center gap-2">
+          <Layers className="text-[#EFB995]" size={22} /> My Enrolled Batches
+        </h3>
+        
         {batches.length === 0 ? (
-          <p className="text-muted-foreground text-sm">You haven't joined any batches yet.</p>
+          <CFEmptyState 
+            icon={Layers}
+            title="No batches yet"
+            description="Create a new batch or join an existing one using a code."
+          />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {batches.map(batch => (
-              <div key={batch._id} className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-3">
-                <div className="flex justify-between items-start">
-                  <h4 className="font-semibold text-lg">{batch.batchName}</h4>
-                  <span className={`text-xs px-2 py-1 rounded-full ${batch.myRole === 'owner' ? 'bg-primary/20 text-primary' : 'bg-secondary text-secondary-foreground'}`}>
+              <CFCard key={batch._id} className="flex flex-col h-full hover:-translate-y-1 transition-transform duration-300">
+                <div className="flex justify-between items-start mb-4">
+                  <h4 className="font-bold text-lg text-[var(--text-primary)] leading-tight pr-2">{batch.batchName}</h4>
+                  <CFBadge variant={batch.myRole === 'owner' ? 'high' : batch.myRole === 'moderator' ? 'medium' : 'default'} className="uppercase">
                     {batch.myRole}
-                  </span>
+                  </CFBadge>
                 </div>
-                <div className="text-sm text-muted-foreground space-y-1">
-                  {batch.college && <p>College: {batch.college}</p>}
-                  {batch.branch && <p>Branch: {batch.branch}</p>}
-                  {batch.semester && <p>Semester: {batch.semester}</p>}
+                
+                <div className="space-y-1.5 text-sm font-medium text-[var(--text-secondary)] flex-1">
+                  {batch.college && <p><span className="text-[var(--text-muted)]">College:</span> {batch.college}</p>}
+                  {batch.branch && <p><span className="text-[var(--text-muted)]">Branch:</span> {batch.branch}</p>}
+                  {batch.semester && <p><span className="text-[var(--text-muted)]">Sem:</span> {batch.semester}</p>}
                 </div>
-                {/* Courses — Feature 4: show course codes */}
+                
                 {batch.courses?.length > 0 && (
-                  <div className="mt-3">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-1.5 flex items-center gap-1">
-                      <BookOpen size={11}/> Courses
+                  <div className="mt-4 pt-4 border-t border-[var(--border)] border-dashed">
+                    <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-2 flex items-center gap-1.5">
+                      <BookOpen size={12} className="text-[#6A68DF]" /> Tracked Courses ({batch.courses.length})
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {batch.courses.map(c => (
-                        <span key={c.code} className="text-[10px] font-mono px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20"
+                        <span key={c.code} className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--bg)] text-[var(--text-secondary)] border border-[var(--border)]"
                           title={`${c.name}${c.faculty ? ' · ' + c.faculty : ''}`}>
                           {c.code}
                         </span>
@@ -305,34 +331,38 @@ export default function BatchPage() {
                     </div>
                   </div>
                 )}
+                
                 {(batch.myRole === 'owner' || batch.myRole === 'moderator') && (
-                  <div className="mt-4 p-3 bg-secondary/50 rounded-lg flex items-center justify-between">
+                  <div className="mt-5 p-3.5 bg-[var(--bg)] rounded-xl border border-[var(--border)] flex items-center justify-between shadow-inner">
                     <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Share Code</p>
-                      <p className="font-mono font-bold tracking-widest text-foreground">{batch.batchCode}</p>
+                      <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-0.5">Invite Code</p>
+                      <p className="font-mono font-bold tracking-widest text-[#6A68DF] text-sm">{batch.batchCode}</p>
                     </div>
-                    <button 
+                    <CFButton 
+                      variant="ghost" 
+                      size="sm"
                       onClick={() => {
                         navigator.clipboard.writeText(batch.batchCode);
                         alert('Code copied to clipboard!');
                       }}
-                      className="p-2 hover:bg-secondary rounded-md transition-colors"
-                      title="Copy code"
-                    >
-                      <Copy size={16} />
-                    </button>
+                      className="text-[var(--text-secondary)] hover:text-[#6A68DF] hover:bg-[#6A68DF]/10 bg-white dark:bg-[var(--card)] border border-[var(--border)] shadow-sm px-2 py-2"
+                      icon={Copy}
+                    />
                   </div>
                 )}
-                {/* Delete button — owner only */}
+                
                 {batch.myRole === 'owner' && (
-                  <button
+                  <CFButton
+                    variant="ghost"
                     onClick={() => setDeleteTarget(batch)}
-                    className="mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-red-500/30 text-red-500 hover:bg-red-500/10 text-xs font-medium transition-colors"
+                    className="mt-4 w-full text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 py-2 border border-red-100 dark:border-red-900/30"
+                    icon={Trash2}
+                    size="sm"
                   >
-                    <Trash2 size={13} /> Delete Batch
-                  </button>
+                    Delete Batch
+                  </CFButton>
                 )}
-              </div>
+              </CFCard>
             ))}
           </div>
         )}

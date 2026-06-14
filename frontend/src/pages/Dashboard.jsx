@@ -1,8 +1,12 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { LayoutDashboard, AlertCircle, CalendarDays, Bot, Users, Sparkles, Loader2, Target, CheckCircle, Bell, ArrowRight, ClipboardList, BookOpen, Briefcase, X, UserCircle2 } from 'lucide-react';
+import { 
+  AlertCircle, Target, Sparkles, ArrowRight, X, UserCircle2, 
+  ClipboardList, BookOpen, Briefcase, CalendarDays, CheckCircle 
+} from 'lucide-react';
 import api from '@/lib/api';
 import { Link } from 'react-router-dom';
+import { CFButton, CFCard, CFBadge, CFSkeleton, CFEmptyState } from '@/components/ui';
 
 export default function DashboardPage() {
   const { user, dbUser } = useAuth();
@@ -47,83 +51,115 @@ export default function DashboardPage() {
     }
   };
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
+
   if (loading) {
-    return <div className="flex justify-center p-10"><Loader2 className="animate-spin text-muted-foreground" /></div>;
+    return (
+      <div className="space-y-6">
+        <CFSkeleton lines={1} className="w-1/3 h-8" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <CFSkeleton card lines={2} />
+          <CFSkeleton card lines={2} />
+          <CFSkeleton card lines={2} />
+          <CFSkeleton card lines={2} />
+        </div>
+        <CFSkeleton card lines={4} className="h-40" />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-8 max-w-6xl pb-10">
       {/* Profile completion banner */}
       {dbUser && dbUser.profileComplete === false && (
-        <div className="relative flex items-center gap-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
-          <UserCircle2 size={20} className="text-amber-400 shrink-0" />
+        <CFCard className="bg-amber-500/10 border-amber-500/30 flex items-center gap-4 py-4">
+          <UserCircle2 size={24} className="text-amber-500 shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-semibold text-amber-400">Your profile is incomplete</p>
-            <p className="text-xs text-amber-400/70">Complete your profile to get accurate eligibility checks and placement recommendations.</p>
+            <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">Your profile is incomplete</p>
+            <p className="text-xs text-amber-600/80 dark:text-amber-400/80">Complete your profile to get accurate eligibility checks and placement recommendations.</p>
           </div>
-          <Link
-            to="/profile"
-            className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-white hover:bg-amber-400 transition-colors"
-          >
-            Complete Profile
+          <Link to="/profile">
+            <CFButton variant="primary" size="sm" className="bg-amber-500 hover:bg-amber-600">Complete Profile</CFButton>
           </Link>
-        </div>
+        </CFCard>
       )}
 
-      {/* Header */}
+      {/* Top Greeting Row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <LayoutDashboard className="text-primary" size={26} />
-          <div>
-            <h2 className="text-2xl font-bold text-foreground">Dashboard</h2>
-            <p className="text-sm text-muted-foreground">
-              Welcome back, <span className="text-primary font-medium">{user?.displayName?.split(' ')[0] || 'Student'}</span>
-            </p>
-          </div>
-        </div>
-        <button 
+        <h2 className="text-2xl font-bold text-[var(--text-primary)]">
+          {getGreeting()}, <span className="text-[#6A68DF]">{user?.displayName?.split(' ')[0] || 'Student'}</span> 👋
+        </h2>
+        <CFButton 
+          variant="secondary" 
+          size="sm" 
           onClick={handleGenerateDigest}
-          disabled={digestLoading}
-          className="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50"
+          loading={digestLoading}
+          icon={Sparkles}
         >
-          {digestLoading ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-          Generate Daily Digest
-        </button>
+          Generate Digest
+        </CFButton>
       </div>
 
-      {/* Daily Digest Result */}
+      {/* Digest Card */}
       {digest && (
-        <div className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-200 dark:border-indigo-900 rounded-xl p-6">
-          <h3 className="text-lg font-bold text-indigo-700 dark:text-indigo-400 flex items-center gap-2 mb-3">
-            <Sparkles size={20} /> Daily Digest
-          </h3>
-          <p className="text-foreground text-sm whitespace-pre-wrap">
+        <CFCard gradient className="relative">
+          <button 
+            onClick={() => setDigest(null)} 
+            className="absolute top-4 right-4 p-1 hover:bg-white/20 rounded-full transition-colors"
+          >
+            <X size={20} className="text-white" />
+          </button>
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles size={24} className="text-white" />
+            <h3 className="text-xl font-bold text-white">Daily Digest</h3>
+          </div>
+          <p className="text-white/90 text-sm whitespace-pre-wrap leading-relaxed">
             {digest.digestText}
           </p>
-        </div>
+        </CFCard>
       )}
+
+      {/* Stats Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Pending Assignments', count: data.counts?.assignments || 0 },
+          { label: 'Upcoming Exams', count: data.counts?.exams || 0 },
+          { label: 'Open Placements', count: data.counts?.placements || 0 },
+          { label: 'Urgent Alerts', count: data.counts?.urgent || 0, isUrgent: true }
+        ].map((stat, idx) => (
+          <CFCard key={idx} className={`p-5 flex flex-col justify-center ${stat.isUrgent && stat.count > 0 ? 'border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-900' : ''}`}>
+            <span className={`text-3xl font-bold ${stat.isUrgent && stat.count > 0 ? 'text-red-500' : 'text-[#6A68DF]'}`}>
+              {stat.count}
+            </span>
+            <span className="text-sm text-[var(--text-secondary)] mt-1 font-medium">{stat.label}</span>
+          </CFCard>
+        ))}
+      </div>
 
       {/* Urgent Alerts */}
       {data.urgentAlerts?.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-lg font-semibold flex items-center gap-2 text-red-500">
-            <AlertCircle size={20} /> Urgent Alerts ({data.counts?.urgent})
+        <div className="space-y-4">
+          <h3 className="text-lg font-bold flex items-center gap-2 text-red-500">
+            <AlertCircle size={20} /> Urgent Alerts
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {data.urgentAlerts.map((alert, i) => (
-              <div key={i} className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <CFCard key={i} className="border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-900 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                  <span className="text-xs font-bold uppercase tracking-wider text-red-600 dark:text-red-400 mb-1 block">
+                  <span className="text-xs font-bold uppercase tracking-wider text-red-500 mb-1 block">
                     {alert.type} DUE &lt; 24h
                   </span>
-                  <p className="font-semibold text-foreground">{alert.title}</p>
+                  <p className="font-semibold text-[var(--text-primary)]">{alert.title}</p>
                 </div>
-                <div className="flex gap-2">
-                  <button className="text-xs font-medium bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-md transition-colors">
-                    Take Action
-                  </button>
-                </div>
-              </div>
+                <CFButton variant="danger" size="sm">
+                  Take Action
+                </CFButton>
+              </CFCard>
             ))}
           </div>
         </div>
@@ -132,79 +168,72 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Today's Focus */}
         <div className="lg:col-span-2 space-y-4">
-          <h3 className="text-lg font-semibold flex items-center gap-2 text-foreground">
-            <Target size={20} className="text-primary" /> Today's Focus
+          <h3 className="text-lg font-bold flex items-center gap-2 text-[var(--text-primary)]">
+            <Target size={20} className="text-[#6A68DF]" /> Today's Focus
           </h3>
           
           {data.focusItems?.length === 0 ? (
-            <div className="bg-secondary/30 border border-border rounded-xl p-8 text-center">
-              <CheckCircle className="text-green-500 mx-auto mb-3" size={32} />
-              <p className="text-muted-foreground">You're all caught up! Enjoy your day.</p>
-            </div>
+            <CFEmptyState 
+              icon={CheckCircle} 
+              title="You're all caught up!" 
+              description="Enjoy your day, no pending tasks for today." 
+            />
           ) : (
             <div className="space-y-3">
               {data.focusItems?.map((item, i) => (
-                <div key={i} className="bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-lg ${
-                      item.type === 'Assignment' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30' :
-                      item.type === 'Exam' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30' :
-                      item.type === 'Placement' ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/30' :
-                      'bg-green-100 text-green-600 dark:bg-green-900/30'
-                    }`}>
-                      {item.type === 'Assignment' ? <ClipboardList size={20} /> :
-                       item.type === 'Exam' ? <BookOpen size={20} /> :
-                       item.type === 'Placement' ? <Briefcase size={20} /> :
-                       <CalendarDays size={20} />}
+                <CFCard key={i} hover className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-5">
+                  <div className="flex items-start gap-4">
+                    <div className="mt-1 shrink-0">
+                      {item.type === 'Assignment' ? <ClipboardList className="text-blue-500" size={24} /> :
+                       item.type === 'Exam' ? <BookOpen className="text-orange-500" size={24} /> :
+                       item.type === 'Placement' ? <Briefcase className="text-purple-500" size={24} /> :
+                       <CalendarDays className="text-green-500" size={24} />}
                     </div>
                     <div>
-                      <p className="font-semibold text-foreground">{item.title}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {item.deadline ? `Due: ${new Date(item.deadline).toLocaleDateString()}` : item.type}
+                      <div className="flex items-center gap-2 mb-1">
+                        <CFBadge variant={item.priority === 'High' ? 'high' : 'default'} className="px-2 py-0.5 text-[10px]">
+                          {item.type}
+                        </CFBadge>
+                      </div>
+                      <p className="font-semibold text-[var(--text-primary)]">{item.title}</p>
+                      <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium">
+                        {item.deadline ? `Due: ${new Date(item.deadline).toLocaleDateString()}` : 'Upcoming'}
                       </p>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <button className="text-xs font-medium border border-border hover:bg-secondary px-3 py-1.5 rounded-md transition-colors">
-                      View
-                    </button>
-                    <button className="text-xs font-medium border border-border hover:bg-secondary px-3 py-1.5 rounded-md transition-colors">
-                      Ask AI
-                    </button>
+                    <CFButton variant="ghost" size="sm">View</CFButton>
+                    <CFButton variant="secondary" size="sm">Ask AI</CFButton>
                   </div>
-                </div>
+                </CFCard>
               ))}
             </div>
           )}
         </div>
 
-        {/* Community Preview */}
+        {/* Recent Notices */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold flex items-center gap-2 text-foreground">
-              <Users size={20} className="text-primary" /> Community
+            <h3 className="text-lg font-bold flex items-center gap-2 text-[var(--text-primary)]">
+              <Users size={20} className="text-[#6A68DF]" /> Recent Notices
             </h3>
-            <Link to="/community" className="text-xs text-primary hover:underline flex items-center gap-1">
-              View all <ArrowRight size={14} />
+            <Link to="/community" className="text-sm text-[#6A68DF] hover:underline font-medium flex items-center gap-1">
+              View All <ArrowRight size={16} />
             </Link>
           </div>
 
           {posts.length === 0 ? (
-            <div className="bg-secondary/30 border border-border rounded-xl p-6 text-center">
-              <p className="text-sm text-muted-foreground">No recent posts.</p>
-            </div>
+            <CFEmptyState title="No recent posts" description="Your community feed is quiet." />
           ) : (
             <div className="space-y-3">
               {posts.map(post => (
-                <div key={post._id} className="bg-card border border-border rounded-xl p-4 shadow-sm">
+                <CFCard key={post._id} hover className="p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider bg-secondary text-secondary-foreground px-2 py-0.5 rounded">
-                      {post.type}
-                    </span>
+                    <CFBadge variant="default" className="text-[10px] py-0.5 px-2">{post.type}</CFBadge>
                   </div>
-                  <h4 className="font-semibold text-sm line-clamp-1">{post.title}</h4>
-                  <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{post.originalText}</p>
-                </div>
+                  <h4 className="font-semibold text-[var(--text-primary)] line-clamp-1">{post.title}</h4>
+                  <p className="text-xs text-[var(--text-secondary)] line-clamp-2 mt-1.5 leading-relaxed">{post.originalText}</p>
+                </CFCard>
               ))}
             </div>
           )}

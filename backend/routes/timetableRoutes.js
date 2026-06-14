@@ -2,6 +2,8 @@ import { Router } from 'express';
 import multer from 'multer';
 import { verifyFirebaseToken } from '../middleware/auth.js';
 import { Timetable } from '../models/Timetable.js';
+import { TimetableOverride } from '../models/TimetableOverride.js';
+import { TimetableLog } from '../models/TimetableLog.js';
 import { BatchMember } from '../models/BatchMember.js';
 import { uploadToS3 } from '../config/s3.js';
 import { invokeAIVision } from '../config/gemini.js';
@@ -177,7 +179,18 @@ router.get('/my-timetable', verifyFirebaseToken, async (req, res) => {
       dayOfWeek: targetDay
     }).populate('batchId', 'batchName batchCode').lean();
 
-    return ok(res, timetables);
+    // Fetch applicable overrides for the exact target date
+    const dateObj = new Date();
+    // Assuming targetDate could be passed in query or we just find overrides for today
+    const reqDate = req.query.date || dateObj.toISOString().split('T')[0];
+
+    const overrides = await TimetableOverride.find({
+      batchId: { $in: batchIds },
+      date: reqDate,
+      status: 'active'
+    }).lean();
+
+    return ok(res, { timetables, overrides });
   } catch (err) {
     console.error('[My Timetable Get Error]', err.message);
     return fail(res, 'Failed to fetch timetable', 500);
@@ -195,10 +208,160 @@ router.get('/batch/:batchId', verifyFirebaseToken, async (req, res) => {
     if (!membership) return fail(res, 'You are not a member of this batch', 403);
 
     const timetables = await Timetable.find({ batchId }).lean();
-    return ok(res, timetables);
+    
+    // Fetch overrides for today
+    const reqDate = req.query.date || new Date().toISOString().split('T')[0];
+    const overrides = await TimetableOverride.find({
+      batchId,
+      date: reqDate,
+      status: 'active'
+    }).lean();
+
+    return ok(res, { timetables, overrides });
   } catch (err) {
     console.error('[Batch Timetable Get Error]', err.message);
     return fail(res, 'Failed to fetch batch timetable', 500);
+  }
+});
+
+// ── Admin Timetable Management (CRUD) ──
+
+async function requireAdmin(batchId, userId) {
+  const membership = await BatchMember.findOne({ batchId, userId });
+  if (!membership || !['owner', 'moderator'].includes(membership.role)) {
+    throw new Error('Unauthorized. Only batch owners or moderators can manage timetable.');
+  }
+}
+
+/**
+ * POST /api/timetable/slot
+ */
+router.post('/slot', verifyFirebaseToken, async (req, res) => {
+  try {
+    const { batchId, dayOfWeek, time, courseCode, courseName, venue, faculty, reason } = req.body;
+    await requireAdmin(batchId, req.user._id);
+
+    let timetable = await Timetable.findOne({ batchId, dayOfWeek });
+    if (!timetable) {
+      timetable = new Timetable({ batchId, dayOfWeek, slots: [], uploadedBy: req.user._id });
+    }
+
+    timetable.slots.push({ time, courseCode, courseName, venue, faculty });
+    await timetable.save();
+
+    await TimetableLog.create({
+      batchId,
+      adminName: req.user.name || 'Admin',
+      changeType: 'creation',
+      reason: reason || '',
+      description: `Added slot for ${courseCode} on ${dayOfWeek} at ${time}`
+    });
+
+    return ok(res, { message: 'Slot added', timetable });
+  } catch (err) {
+    return fail(res, err.message, err.message.includes('Unauthorized') ? 403 : 500);
+  }
+});
+
+/**
+ * PUT /api/timetable/slot/:slotId
+ */
+router.put('/slot/:slotId', verifyFirebaseToken, async (req, res) => {
+  try {
+    const { slotId } = req.params;
+    const { batchId, time, courseCode, courseName, venue, faculty, reason } = req.body;
+    await requireAdmin(batchId, req.user._id);
+
+    const timetable = await Timetable.findOne({ batchId, 'slots._id': slotId });
+    if (!timetable) return fail(res, 'Slot not found', 404);
+
+    const slot = timetable.slots.id(slotId);
+    if (!slot) return fail(res, 'Slot not found', 404);
+
+    slot.time = time || slot.time;
+    slot.courseCode = courseCode || slot.courseCode;
+    slot.courseName = courseName !== undefined ? courseName : slot.courseName;
+    slot.venue = venue !== undefined ? venue : slot.venue;
+    slot.faculty = faculty !== undefined ? faculty : slot.faculty;
+    
+    await timetable.save();
+
+    await TimetableLog.create({
+      batchId,
+      adminName: req.user.name || 'Admin',
+      changeType: 'permanent',
+      reason: reason || '',
+      description: `Updated slot ${courseCode} for ${timetable.dayOfWeek} at ${time}`
+    });
+
+    return ok(res, { message: 'Slot updated', timetable });
+  } catch (err) {
+    return fail(res, err.message, err.message.includes('Unauthorized') ? 403 : 500);
+  }
+});
+
+/**
+ * DELETE /api/timetable/slot/:slotId
+ */
+router.delete('/slot/:slotId', verifyFirebaseToken, async (req, res) => {
+  try {
+    const { slotId } = req.params;
+    const { batchId, reason } = req.body;
+    await requireAdmin(batchId, req.user._id);
+
+    const timetable = await Timetable.findOne({ batchId, 'slots._id': slotId });
+    if (!timetable) return fail(res, 'Slot not found', 404);
+
+    const slot = timetable.slots.id(slotId);
+    if (!slot) return fail(res, 'Slot not found', 404);
+    
+    const courseInfo = `${slot.courseCode} at ${slot.time}`;
+    timetable.slots.pull(slotId);
+    await timetable.save();
+
+    await TimetableLog.create({
+      batchId,
+      adminName: req.user.name || 'Admin',
+      changeType: 'deletion',
+      reason: reason || '',
+      description: `Deleted slot ${courseInfo} on ${timetable.dayOfWeek}`
+    });
+
+    return ok(res, { message: 'Slot deleted' });
+  } catch (err) {
+    return fail(res, err.message, err.message.includes('Unauthorized') ? 403 : 500);
+  }
+});
+
+/**
+ * POST /api/timetable/override
+ */
+router.post('/override', verifyFirebaseToken, async (req, res) => {
+  try {
+    const { batchId, originalSlotId, date, overrideType, newDetails, reason } = req.body;
+    await requireAdmin(batchId, req.user._id);
+
+    const override = await TimetableOverride.create({
+      batchId,
+      originalSlotId,
+      date,
+      overrideType,
+      newDetails,
+      reason,
+      adminName: req.user.name || 'Admin'
+    });
+
+    await TimetableLog.create({
+      batchId,
+      adminName: req.user.name || 'Admin',
+      changeType: 'temporary',
+      reason: reason || '',
+      description: `Applied ${overrideType} override for slot ${originalSlotId} on ${date}`
+    });
+
+    return ok(res, { message: 'Override applied', override });
+  } catch (err) {
+    return fail(res, err.message, err.message.includes('Unauthorized') ? 403 : 500);
   }
 });
 

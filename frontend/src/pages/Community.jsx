@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Users, Pin, CheckCircle, Trash2, Loader2, Send, AlertCircle, ChevronDown, ChevronUp, ShieldCheck, FileWarning } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Users, Pin, CheckCircle, Trash2, Send, AlertCircle, ShieldCheck, FileWarning, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { CFButton, CFCard, CFBadge, CFInput, CFSkeleton, CFEmptyState } from '@/components/ui';
+import { cn } from '@/lib/utils';
 
 const CATEGORIES = ['all', 'academic', 'assignment', 'exam', 'placement', 'event', 'hostel', 'transport', 'resource', 'general'];
 
@@ -40,13 +42,14 @@ export default function CommunityPage() {
   }, []);
 
   const fetchPosts = async () => {
-    if (!selectedBatch) return;
-    try {
-      const url = `/api/posts/${selectedBatch._id}${category !== 'all' ? `?category=${category}` : ''}`;
-      const res = await api.get(url);
-      setPosts(res.data);
-    } catch (err) {
-      console.error(err);
+    if (selectedBatch) {
+      try {
+        const url = `/api/posts/${selectedBatch._id}${category !== 'all' ? `?category=${category}` : ''}`;
+        const res = await api.get(url);
+        setPosts(res.data);
+      } catch (err) {
+        console.error(err);
+      }
     }
   };
 
@@ -102,16 +105,22 @@ export default function CommunityPage() {
   };
 
   if (loading) {
-    return <div className="flex justify-center p-10"><Loader2 className="animate-spin text-muted-foreground" /></div>;
+    return (
+      <div className="space-y-6">
+        <CFSkeleton lines={1} className="w-1/3 h-8" />
+        <CFSkeleton card lines={3} className="h-40" />
+        <CFSkeleton card lines={4} className="h-48" />
+      </div>
+    );
   }
 
   if (batches.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-10 space-y-4">
-        <Users size={48} className="text-muted-foreground" />
-        <h2 className="text-xl font-bold">No Batches Yet</h2>
-        <p className="text-muted-foreground">Join or create a batch to view the community feed.</p>
-      </div>
+      <CFEmptyState 
+        icon={Users}
+        title="No Batches Yet"
+        description="Join or create a batch to view the community feed."
+      />
     );
   }
 
@@ -119,14 +128,14 @@ export default function CommunityPage() {
 
   return (
     <div className="space-y-6 max-w-4xl pb-10">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Users className="text-primary" size={26} />
-          <h2 className="text-2xl font-bold text-foreground">Community Feed</h2>
+          <Users className="text-[#6A68DF]" size={26} />
+          <h2 className="text-2xl font-bold text-[var(--text-primary)]">Community Feed</h2>
         </div>
         
         <select 
-          className="bg-background border border-border rounded-md px-3 py-1.5 text-sm"
+          className="bg-[var(--card)] border border-[var(--border)] rounded-2xl px-4 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#6A68DF]/30"
           value={selectedBatch?._id || ''}
           onChange={(e) => setSelectedBatch(batches.find(b => b._id === e.target.value))}
         >
@@ -137,12 +146,12 @@ export default function CommunityPage() {
       </div>
 
       {/* Composer */}
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+      <CFCard className="space-y-4">
         <form onSubmit={handlePost}>
           <input
             required
             placeholder="Post Title"
-            className="w-full bg-transparent border-none text-lg font-semibold outline-none placeholder:text-muted-foreground mb-2"
+            className="w-full bg-transparent border-none text-lg font-semibold text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] mb-3"
             value={newPost.title}
             onChange={e => setNewPost({...newPost, title: e.target.value})}
           />
@@ -150,13 +159,13 @@ export default function CommunityPage() {
             required
             rows={3}
             placeholder="What's happening in your batch?"
-            className="w-full bg-transparent border-none text-sm outline-none resize-none placeholder:text-muted-foreground/70"
+            className="w-full bg-transparent border-none text-sm text-[var(--text-primary)] outline-none resize-none placeholder:text-[var(--text-muted)]"
             value={newPost.originalText}
             onChange={e => setNewPost({...newPost, originalText: e.target.value})}
           />
-          <div className="flex items-center justify-between mt-2 pt-2 border-t border-border">
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-[var(--border)]">
             <select
-              className="bg-secondary text-secondary-foreground text-xs rounded-md px-2 py-1 outline-none"
+              className="bg-[var(--bg)] text-[var(--text-primary)] text-xs rounded-full px-4 py-2 outline-none border border-[var(--border)]"
               value={newPost.type}
               onChange={e => setNewPost({...newPost, type: e.target.value})}
             >
@@ -164,20 +173,25 @@ export default function CommunityPage() {
                 <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
               ))}
             </select>
-            <button disabled={posting} type="submit" className="bg-primary text-primary-foreground p-2 rounded-full hover:bg-primary/90 transition-colors disabled:opacity-50">
-              {posting ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
-            </button>
+            <CFButton variant="primary" loading={posting} type="submit" size="sm" icon={Send}>
+              Post
+            </CFButton>
           </div>
         </form>
-      </div>
+      </CFCard>
 
-      {/* Filters */}
+      {/* Category Filter Chips */}
       <div className="flex flex-wrap gap-2">
         {CATEGORIES.map(c => (
           <button
             key={c}
             onClick={() => setCategory(c)}
-            className={`px-3 py-1 rounded-full text-xs font-medium capitalize transition-colors ${category === c ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}
+            className={cn(
+              "inline-flex items-center justify-center rounded-full px-4 py-1.5 text-xs font-medium whitespace-nowrap transition-all duration-200",
+              category === c 
+                ? "bg-[#6A68DF] text-white" 
+                : "bg-[var(--card)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg)] hover:text-[var(--text-primary)]"
+            )}
           >
             {c}
           </button>
@@ -187,112 +201,85 @@ export default function CommunityPage() {
       {/* Feed */}
       <div className="space-y-4">
         {posts.length === 0 ? (
-          <p className="text-muted-foreground text-center py-10">No posts found in this category.</p>
+          <CFEmptyState title="No posts found" description="There are no posts in this category." />
         ) : (
           posts.map(post => {
             const isDuplicateCollapsed = post.isDuplicate && !expandedDuplicates[post._id];
             
             // Verification Badge Logic
-            let badgeText = "Unverified Student Upload";
-            let badgeIcon = <AlertCircle size={10} />;
-            let badgeColor = "text-gray-500 bg-gray-100 dark:bg-gray-800 dark:text-gray-400";
+            let badgeText = "Unverified";
+            let badgeVariant = "default";
             
             if (post.verificationStatus === 'verified') {
               if (post.verifiedBy?.role === 'admin') {
-                badgeText = "Official College Notice";
-                badgeIcon = <ShieldCheck size={10} />;
-                badgeColor = "text-blue-600 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400";
+                badgeText = "Official Notice";
+                badgeVariant = "low";
               } else if (post.verifiedBy?.role === 'cr') {
                 badgeText = "Verified by CR";
-                badgeIcon = <CheckCircle size={10} />;
-                badgeColor = "text-purple-600 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-400";
+                badgeVariant = "success";
               } else {
-                badgeText = "Verified by Moderator";
-                badgeIcon = <CheckCircle size={10} />;
-                badgeColor = "text-green-600 bg-green-100 dark:bg-green-900/30 dark:text-green-400";
+                badgeText = "Verified";
+                badgeVariant = "success";
               }
             }
 
             // Priority Badge Logic
-            let priorityColor = "bg-gray-100 text-gray-700";
-            if (post.priorityLevel === 'high' || post.priorityLevel === 'urgent') priorityColor = "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
-            else if (post.priorityLevel === 'medium') priorityColor = "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
-            else if (post.priorityLevel === 'low') priorityColor = "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+            let priorityVariant = "default";
+            if (post.priorityLevel === 'high' || post.priorityLevel === 'urgent') priorityVariant = "high";
+            else if (post.priorityLevel === 'medium') priorityVariant = "medium";
+            else if (post.priorityLevel === 'low') priorityVariant = "low";
+
+            const relativeTimestamp = new Date(post.createdAt).toLocaleDateString();
 
             return (
-              <div key={post._id} className={`bg-card border ${post.isPinned ? 'border-primary/50 ring-1 ring-primary/20' : 'border-border'} rounded-xl p-5 shadow-sm transition-all`}>
+              <CFCard key={post._id} className={cn("transition-all", isDuplicateCollapsed ? "opacity-60" : "")}>
                 <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <span className="text-xs font-medium px-2 py-0.5 rounded bg-secondary text-secondary-foreground capitalize">
-                        {post.type}
-                      </span>
-                      
-                      <span className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${badgeColor}`}>
-                        {badgeIcon} {badgeText}
-                      </span>
-                      
-                      {post.isPinned && (
-                        <span className="flex items-center gap-1 text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                          <Pin size={10} /> Pinned
-                        </span>
-                      )}
-
-                      {post.priorityLevel && post.priorityLevel !== 'low' && (
-                        <span className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${priorityColor}`}>
-                          {post.priorityLevel} Priority
-                        </span>
-                      )}
-
-                      {post.isDuplicate && (
-                        <span className="flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                          <FileWarning size={10} /> Duplicate — merged
-                        </span>
-                      )}
-                    </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <CFBadge variant="default" className="capitalize">{post.type}</CFBadge>
                     
-                    <div className="flex items-center gap-2 mt-2">
-                      <h3 className={`text-lg font-bold ${isDuplicateCollapsed ? 'text-muted-foreground' : 'text-foreground'}`}>
-                        {post.title}
-                      </h3>
-                      {post.isDuplicate && (
-                        <button onClick={() => toggleDuplicate(post._id)} className="text-xs text-primary hover:underline">
-                          {isDuplicateCollapsed ? 'Show' : 'Hide'}
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {post.uploadedBy?.name || 'Unknown'} • {new Date(post.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  
-                  {/* Actions */}
-                  <div className="flex gap-2">
-                    {isMod && (
-                      <>
-                        <button onClick={() => handlePin(post._id)} className={`p-1.5 rounded-md hover:bg-secondary ${post.isPinned ? 'text-primary' : 'text-muted-foreground'}`} title="Pin">
-                          <Pin size={16} />
-                        </button>
-                        {post.verificationStatus !== 'verified' && (
-                          <button onClick={() => handleVerify(post._id)} className="p-1.5 rounded-md hover:bg-green-100 text-muted-foreground hover:text-green-600" title="Verify">
-                            <CheckCircle size={16} />
-                          </button>
-                        )}
-                      </>
+                    <CFBadge variant={badgeVariant} className="flex items-center gap-1">
+                      {badgeText === "Unverified" ? <AlertCircle size={12} /> : <ShieldCheck size={12} />}
+                      {badgeText}
+                    </CFBadge>
+                    
+                    {post.isPinned && (
+                      <CFBadge variant="default" className="flex items-center gap-1 bg-[#6A68DF]/20">
+                        <Pin size={12} /> Pinned
+                      </CFBadge>
                     )}
-                    {(isMod || post.uploadedBy?._id === user?.uid) && (
-                      <button onClick={() => handleDelete(post._id)} className="p-1.5 rounded-md hover:bg-red-100 text-muted-foreground hover:text-red-500" title="Delete">
-                        <Trash2 size={16} />
-                      </button>
+
+                    {post.priorityLevel && post.priorityLevel !== 'low' && (
+                      <CFBadge variant={priorityVariant} className="uppercase">
+                        {post.priorityLevel}
+                      </CFBadge>
                     )}
+
+                    {post.isDuplicate && (
+                      <CFBadge variant="warning" className="flex items-center gap-1">
+                        <FileWarning size={12} /> Duplicate
+                      </CFBadge>
+                    )}
+                    
+                    <span className="text-[10px] text-[var(--text-muted)] ml-2">{relativeTimestamp}</span>
                   </div>
                 </div>
 
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+                    {post.title}
+                  </h3>
+                  {post.isDuplicate && (
+                    <button onClick={() => toggleDuplicate(post._id)} className="text-xs text-[#6A68DF] hover:underline font-medium">
+                      {isDuplicateCollapsed ? 'Show' : 'Hide'}
+                    </button>
+                  )}
+                </div>
+
                 {!isDuplicateCollapsed && (
-                  <div className="space-y-3 mt-4">
+                  <div className="space-y-4">
                     {post.actionRequired && (
-                      <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-3 rounded-r-md">
-                        <p className="text-sm font-semibold text-red-800 dark:text-red-300 flex items-center gap-2">
+                      <div className="border-l-4 border-[#6A68DF] pl-3 bg-[#6A68DF]/5 rounded-r-xl py-2">
+                        <p className="text-sm font-semibold text-[#6A68DF] flex items-center gap-2">
                           <AlertCircle size={16} /> Action Required
                         </p>
                       </div>
@@ -300,33 +287,64 @@ export default function CommunityPage() {
                     
                     {post.summary ? (
                       <div>
-                        <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-                          <p className="font-semibold text-muted-foreground mb-1 text-xs uppercase tracking-wider">AI Summary</p>
+                        <div className={cn("text-sm text-[var(--text-secondary)]", !expandedPosts[post._id] && "line-clamp-3")}>
                           {post.summary}
                         </div>
                         
-                        <div className="mt-3 pt-3 border-t border-border">
+                        <div className="mt-2">
                           <button 
                             onClick={() => toggleExpand(post._id)}
-                            className="flex items-center gap-1 text-xs text-primary hover:underline font-medium"
+                            className="flex items-center gap-1 text-xs text-[#6A68DF] hover:underline font-medium"
                           >
                             {expandedPosts[post._id] ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
                             {expandedPosts[post._id] ? 'Hide full text' : 'Show full text'}
                           </button>
                           
                           {expandedPosts[post._id] && (
-                            <div className="mt-3 text-sm text-muted-foreground whitespace-pre-wrap bg-secondary/30 p-3 rounded-md">
+                            <div className="mt-3 text-sm text-[var(--text-primary)] whitespace-pre-wrap bg-[var(--bg)] p-4 rounded-xl border border-[var(--border)]">
                               {post.originalText}
                             </div>
                           )}
                         </div>
                       </div>
                     ) : (
-                      <p className="text-sm text-foreground whitespace-pre-wrap">{post.originalText}</p>
+                      <p className={cn("text-sm text-[var(--text-secondary)] whitespace-pre-wrap", !expandedPosts[post._id] && "line-clamp-3")}>
+                        {post.originalText}
+                      </p>
                     )}
                   </div>
                 )}
-              </div>
+                
+                {/* Bottom Row */}
+                <div className="flex items-center justify-between mt-4 pt-4 border-t border-[var(--border)]">
+                  <p className="text-xs font-medium text-[var(--text-muted)] flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-gradient-to-br from-[#6A68DF]/20 to-[#EFB995]/20 flex items-center justify-center text-[10px] text-[var(--text-primary)]">
+                      {post.uploadedBy?.name ? post.uploadedBy.name.charAt(0).toUpperCase() : 'U'}
+                    </span>
+                    {post.uploadedBy?.name || 'Unknown'}
+                  </p>
+                  
+                  <div className="flex gap-1">
+                    {isMod && (
+                      <>
+                        <CFButton variant="ghost" size="sm" onClick={() => handlePin(post._id)} className={post.isPinned ? 'text-[#6A68DF] bg-[#6A68DF]/10' : 'text-[var(--text-muted)]'}>
+                          <Pin size={16} className="mr-1" /> Pin
+                        </CFButton>
+                        {post.verificationStatus !== 'verified' && (
+                          <CFButton variant="ghost" size="sm" onClick={() => handleVerify(post._id)} className="text-[var(--text-muted)] hover:text-green-600 hover:bg-green-500/10">
+                            <CheckCircle size={16} className="mr-1" /> Verify
+                          </CFButton>
+                        )}
+                      </>
+                    )}
+                    {(isMod || post.uploadedBy?._id === user?.uid) && (
+                      <CFButton variant="ghost" size="sm" onClick={() => handleDelete(post._id)} className="text-[var(--text-muted)] hover:text-red-500 hover:bg-red-500/10">
+                        <Trash2 size={16} className="mr-1" /> Delete
+                      </CFButton>
+                    )}
+                  </div>
+                </div>
+              </CFCard>
             );
           })
         )}
