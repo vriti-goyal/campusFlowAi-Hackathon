@@ -18,20 +18,24 @@ import {
   X,
   GraduationCap,
   Bell,
-  CheckCircle2
+  CheckCircle2,
+  Mail,
+  Clock,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { to: '/dashboard',   label: 'Dashboard',   icon: LayoutDashboard },
-  { to: '/community',   label: 'Community',   icon: Users },
-  { to: '/assignments', label: 'Assignments', icon: ClipboardList },
-  { to: '/exams',       label: 'Exams',       icon: BookOpen },
-  { to: '/placements',  label: 'Placements',  icon: Briefcase },
-  { to: '/calendar',    label: 'Calendar',    icon: CalendarDays },
-  { to: '/assistant',   label: 'AI Assistant', icon: Bot },
-  { to: '/upload',      label: 'Upload',      icon: Upload },
-  { to: '/batch',       label: 'Batch Ops',   icon: Layers },
-  { to: '/profile',     label: 'Profile',     icon: UserCircle },
+  { to: '/dashboard',          label: 'Dashboard',              icon: LayoutDashboard },
+  { to: '/community',          label: 'Community',              icon: Users },
+  { to: '/assignments',        label: 'Assignments',            icon: ClipboardList },
+  { to: '/exams',              label: 'Exams',                  icon: BookOpen },
+  { to: '/placements',         label: 'Placements',             icon: Briefcase },
+  { to: '/placement-notices',  label: 'Placement Intel',        icon: Mail },
+  { to: '/timetable',          label: 'Timetable',              icon: Clock },
+  { to: '/calendar',           label: 'Calendar',               icon: CalendarDays },
+  { to: '/assistant',          label: 'AI Assistant',           icon: Bot },
+  { to: '/upload',             label: 'Upload',                 icon: Upload },
+  { to: '/batch',              label: 'Batch Ops',              icon: Layers },
+  { to: '/profile',            label: 'Profile',                icon: UserCircle },
 ];
 
 function NotificationBell() {

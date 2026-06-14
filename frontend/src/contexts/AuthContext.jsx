@@ -4,14 +4,27 @@ import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase';
 import { setAuthToken, setupInterceptors } from '@/lib/api';
 import { useToast } from '@/contexts/ToastContext';
+import api from '@/lib/api';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);        // Firebase user object
+  const [dbUser, setDbUser] = useState(null);    // MongoDB User document
   const [idToken, setIdToken] = useState(null);  // Raw ID token string
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+
+  const fetchDbUser = async () => {
+    try {
+      const res = await api.get('/api/users/me');
+      setDbUser(res.data);
+      return res.data;
+    } catch (err) {
+      console.error('Failed to fetch DB user:', err.message);
+      return null;
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -21,8 +34,10 @@ export function AuthProvider({ children }) {
         setIdToken(token);
         setAuthToken(token);
         setupInterceptors(toast);
+        await fetchDbUser();
       } else {
         setUser(null);
+        setDbUser(null);
         setIdToken(null);
         setAuthToken(null);
       }
@@ -37,12 +52,15 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     await signOut(auth);
     setUser(null);
+    setDbUser(null);
     setIdToken(null);
     setAuthToken(null);
   };
 
+  const refreshDbUser = () => fetchDbUser();
+
   return (
-    <AuthContext.Provider value={{ user, idToken, loading, signInWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, dbUser, idToken, loading, signInWithGoogle, logout, refreshDbUser }}>
       {children}
     </AuthContext.Provider>
   );

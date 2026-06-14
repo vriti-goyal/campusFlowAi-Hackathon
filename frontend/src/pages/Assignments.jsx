@@ -23,8 +23,25 @@ export default function AssignmentsPage() {
 
   const fetchAssignments = async () => {
     try {
-      const res = await api.get('/api/assignments', { params: { batchId: 'default-batch' } });
-      setAssignments(res.data.data || []);
+      // Get user's batches, then fetch assignments for each
+      const batchRes = await api.get('/api/batch/my-batches').catch(() => ({ data: [] }));
+      const batches = batchRes.data || [];
+
+      if (batches.length === 0) {
+        // No batches — fetch all assignments without batchId filter
+        const res = await api.get('/api/assignments');
+        setAssignments(res.data.data || []);
+      } else {
+        const allAssignments = [];
+        const seenIds = new Set();
+        for (const b of batches) {
+          const res = await api.get('/api/assignments', { params: { batchId: b._id } });
+          for (const a of (res.data.data || [])) {
+            if (!seenIds.has(a._id)) { seenIds.add(a._id); allAssignments.push(a); }
+          }
+        }
+        setAssignments(allAssignments);
+      }
     } catch {
       // Silently handle — show empty state
     } finally {

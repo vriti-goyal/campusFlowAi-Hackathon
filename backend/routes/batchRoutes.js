@@ -12,8 +12,23 @@ const generateBatchCode = () => Math.random().toString(36).substring(2, 10).toUp
 // POST /api/batch/create
 router.post('/create', async (req, res) => {
   try {
-    const { batchName, college, branch, semester } = req.body;
+    const { batchName, college, branch, semester, courses = [] } = req.body;
     if (!batchName) return res.status(400).json({ error: 'Batch name is required' });
+
+    // Validate courses: code + name required, codes unique within batch
+    const seenCodes = new Set();
+    const validatedCourses = [];
+    for (const c of courses) {
+      if (!c.code?.trim() || !c.name?.trim()) {
+        return res.status(400).json({ error: 'Each course must have a code and a name' });
+      }
+      const code = c.code.trim().toUpperCase();
+      if (seenCodes.has(code)) {
+        return res.status(400).json({ error: `Duplicate course code: ${code}` });
+      }
+      seenCodes.add(code);
+      validatedCourses.push({ code, name: c.name.trim(), faculty: c.faculty?.trim() || '' });
+    }
 
     let batchCode;
     let isUnique = false;
@@ -29,7 +44,8 @@ router.post('/create', async (req, res) => {
       college,
       branch,
       semester,
-      ownerId: req.user._id
+      ownerId: req.user._id,
+      courses: validatedCourses,
     });
 
     await BatchMember.create({
@@ -74,13 +90,73 @@ router.post('/join', async (req, res) => {
 router.get('/my-batches', async (req, res) => {
   try {
     const members = await BatchMember.find({ userId: req.user._id }).populate('batchId');
-    const batches = members.map(m => ({ ...m.batchId.toObject(), myRole: m.role }));
+    const batches = members
+      .filter(m => m.batchId && m.batchId.status !== 'deleted')
+      .map(m => ({ ...m.batchId.toObject(), myRole: m.role }));
     res.json(batches);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to fetch batches' });
   }
 });
+
+// GET /api/batch/:batchId  — batch detail with courses
+router.get('/:batchId', async (req, res) => {
+  try {
+    const batch = await Batch.findById(req.params.batchId);
+    if (!batch || batch.status === 'deleted') return res.status(404).json({ error: 'Batch not found' });
+
+    // Verify membership
+    const membership = await BatchMember.findOne({ batchId: batch._id, userId: req.user._id });
+    if (!membership) return res.status(403).json({ error: 'You are not a member of this batch' });
+
+    res.json({ ...batch.toObject(), myRole: membership.role });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch batch' });
+  }
+});
+
+/**
+ * PATCH /api/batch/:batchId/courses
+ * Replace the courses array for a batch (owner/moderator only).
+ * Validates unique codes within the new list.
+ */
+router.patch('/:batchId/courses', async (req, res) => {
+  try {
+    const { courses = [] } = req.body;
+    const batch = await Batch.findById(req.params.batchId);
+    if (!batch || batch.status === 'deleted') return res.status(404).json({ error: 'Batch not found' });
+
+    const membership = await BatchMember.findOne({ batchId: batch._id, userId: req.user._id });
+    if (!membership || !['owner', 'moderator'].includes(membership.role)) {
+      return res.status(403).json({ error: 'Only owners or moderators can update courses' });
+    }
+
+    const seenCodes = new Set();
+    const validatedCourses = [];
+    for (const c of courses) {
+      if (!c.code?.trim() || !c.name?.trim()) {
+        return res.status(400).json({ error: 'Each course must have a code and a name' });
+      }
+      const code = c.code.trim().toUpperCase();
+      if (seenCodes.has(code)) {
+        return res.status(400).json({ error: `Duplicate course code: ${code}` });
+      }
+      seenCodes.add(code);
+      validatedCourses.push({ code, name: c.name.trim(), faculty: c.faculty?.trim() || '' });
+    }
+
+    batch.courses = validatedCourses;
+    await batch.save();
+
+    res.json(batch);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update courses' });
+  }
+});
+
 
 // GET /api/batch/:batchId/members
 router.get('/:batchId/members', async (req, res) => {
@@ -117,6 +193,60 @@ router.patch('/:batchId/member/:userId/role', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to update role' });
+  }
+});
+
+/**
+ * DELETE /api/batch/:batchId
+ * Soft-deletes (archives) a batch.
+ * Only the batch owner or a platform admin can do this.
+ * Requires body: { confirmName: "<exact batch name>" }
+ * Returns 409 if there are still active members other than the owner.
+ */
+router.delete('/:batchId', async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    const { confirmName } = req.body;
+
+    const batch = await Batch.findById(batchId);
+    if (!batch || batch.status === 'deleted') {
+      return res.status(404).json({ error: 'Batch not found' });
+    }
+
+    // Access control: must be owner or platform admin
+    const isOwner = batch.ownerId.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === 'admin';
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ error: 'Only the batch owner or an admin can delete a batch' });
+    }
+
+    // Typed confirmation: the caller must provide the exact batch name
+    if (!confirmName || confirmName !== batch.batchName) {
+      return res.status(400).json({
+        error: `Confirmation failed. Please type the exact batch name: "${batch.batchName}"`,
+      });
+    }
+
+    // Guard: refuse if there are other active members enrolled (besides the owner)
+    const memberCount = await BatchMember.countDocuments({ batchId: batch._id });
+    if (memberCount > 1) {
+      return res.status(409).json({
+        error: `Cannot delete a batch with ${memberCount - 1} active member(s) still enrolled. Remove all members first.`,
+        memberCount,
+      });
+    }
+
+    // Soft delete (archive) — NEVER hard delete
+    batch.status = 'deleted';
+    batch.deletedAt = new Date();
+    await batch.save();
+
+    console.log(`[Batch] Archived batch ${batch._id} ("${batch.batchName}") by user ${req.user._id}`);
+
+    res.json({ message: `Batch "${batch.batchName}" has been archived successfully.` });
+  } catch (error) {
+    console.error('[Batch Delete] Error:', error);
+    res.status(500).json({ error: 'Failed to delete batch' });
   }
 });
 

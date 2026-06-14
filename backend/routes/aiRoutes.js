@@ -7,6 +7,8 @@ import { Placement } from '../models/Placement.js';
 import { StudentPlacementStatus } from '../models/StudentPlacementStatus.js';
 import { CalendarEvent } from '../models/CalendarEvent.js';
 import { Post } from '../models/Post.js';
+import { Timetable } from '../models/Timetable.js';
+import { BatchMember } from '../models/BatchMember.js';
 import { invokeTitan } from '../config/bedrock.js';
 
 const router = express.Router();
@@ -164,6 +166,19 @@ async function gatherDigestContext(user) {
     date: { $gte: now },
   }).sort({ date: 1 }).lean();
 
+  // Tomorrow's classes
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const tomorrowStr = days[tomorrow.getDay()];
+  
+  const memberships = await BatchMember.find({ userId: user._id }).lean();
+  let tomorrowsClasses = [];
+  if (memberships.length > 0) {
+    const batchIds = memberships.map(m => m.batchId);
+    const timetables = await Timetable.find({ batchId: { $in: batchIds }, dayOfWeek: tomorrowStr }).lean();
+    tomorrowsClasses = timetables.flatMap(t => t.slots.map(s => `${s.time}: ${s.courseName || s.courseCode}`));
+  }
+
   return {
     name,
     pendingAssignments,
@@ -172,6 +187,7 @@ async function gatherDigestContext(user) {
     urgentPosts,
     nextAssignment: nextAssignment ? { title: nextAssignment.title, deadline: nextAssignment.deadline } : null,
     nextExam: nextExam ? { subject: nextExam.subject, date: nextExam.date } : null,
+    tomorrowsClasses: tomorrowsClasses.length > 0 ? tomorrowsClasses : 'No classes tomorrow',
   };
 }
 

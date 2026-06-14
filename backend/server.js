@@ -16,6 +16,11 @@ import calendarRoutes from './routes/calendarRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import gmailRoutes from './routes/gmailRoutes.js';
+import placementNoticeRoutes from './routes/placementNoticeRoutes.js';
+import examScheduleRoutes from './routes/examScheduleRoutes.js';
+import timetableRoutes from './routes/timetableRoutes.js';
+import { startCronJobs } from './cron.js';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -45,6 +50,10 @@ app.use('/api/calendar', calendarRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/gmail', gmailRoutes);
+app.use('/api/placement-notices', placementNoticeRoutes);
+app.use('/api/exam-schedule', examScheduleRoutes);
+app.use('/api/timetable', timetableRoutes);
 
 // ── 404 catch-all ───────────────────────────────────────────
 app.use((req, res) => {
@@ -57,7 +66,10 @@ app.use((err, req, res, _next) => {
   res.status(500).json({ error: err.message || 'Internal Server Error' });
 });
 
-// ── Start ────────────────────────────────────────────────────
+// ── Initialize Background Jobs ──────────────────────────────
+startCronJobs();
+
+// ── Database & Storage ──────────────────────────────────────
 connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`🚀  CampusFlow API running on http://localhost:${PORT}`);

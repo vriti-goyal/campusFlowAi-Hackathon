@@ -2,8 +2,13 @@ import { Router } from 'express';
 import multer from 'multer';
 import { verifyFirebaseToken } from '../middleware/auth.js';
 import { uploadToS3 } from '../config/s3.js';
+import { extractTextFromFile } from '../config/textract.js';
 import { processUpload } from '../services/aiPipeline.js';
+import { detectDocumentType, extractTimetableFromText, extractExamScheduleFromText } from '../services/documentExtractor.js';
 import { Post } from '../models/Post.js';
+import { Timetable } from '../models/Timetable.js';
+import { ExamSchedule } from '../models/ExamSchedule.js';
+import { BatchMember } from '../models/BatchMember.js';
 import { ok, fail } from '../utils/response.js';
 
 const router = Router();
@@ -21,22 +26,142 @@ const upload = multer({
 
 /**
  * POST /api/upload/file
- * Multipart file upload → S3 → AI pipeline stub → create Post
+ * Multipart file upload → S3 → AI pipeline → create Post
+ *
+ * NEW: Auto-detects timetable & exam schedule PDFs.
+ * If detected, routes to timetable/exam-schedule storage instead of creating a Post.
+ * Requires targetBatchId for timetable/exam auto-routing.
  */
 router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return fail(res, 'No file provided', 400);
 
-    const { batchId } = req.body;
+    const { batchId, targetType, targetBatchId } = req.body;
     if (!batchId) return fail(res, 'batchId is required', 400);
 
     // Upload to S3
     const fileUrl = await uploadToS3(req.file.buffer, req.file.originalname, req.file.mimetype);
 
-    // Run AI pipeline stub
+    // Extract text via Textract for document type detection
+    let extractedText = '';
+    try {
+      extractedText = await extractTextFromFile(fileUrl);
+    } catch (err) {
+      console.error('[Upload] Textract failed:', err.message);
+    }
+
+    // ── Auto-detect document type ──
+    const docType = extractedText ? detectDocumentType(extractedText) : 'general';
+    console.log(`[Upload] Detected document type: ${docType}`);
+
+    // ── Timetable detected ──
+    if (docType === 'timetable' && targetBatchId && targetBatchId !== 'personal') {
+      // Verify admin access
+      const membership = await BatchMember.findOne({ batchId: targetBatchId, userId: req.user._id });
+      if (!membership || !['owner', 'moderator'].includes(membership.role)) {
+        return fail(res, 'Only batch owners or moderators can upload timetables. This PDF looks like a timetable.', 403);
+      }
+
+      const rows = await extractTimetableFromText(extractedText);
+      if (!rows || rows.length === 0) {
+        return fail(res, 'AI detected a timetable but could not extract entries. Try a clearer PDF.', 400);
+      }
+
+      // Build day map and upsert
+      const validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      const dayMap = {};
+      for (const row of rows) {
+        const rawDay = row.day?.trim() || '';
+        const dayStr = rawDay.charAt(0).toUpperCase() + rawDay.slice(1).toLowerCase();
+        if (!validDays.includes(dayStr)) continue;
+        if (!dayMap[dayStr]) dayMap[dayStr] = [];
+        dayMap[dayStr].push({
+          time: row.time?.trim() || '',
+          courseCode: (row.course_code || '').trim().toUpperCase(),
+          courseName: (row.course_name || '').trim(),
+          venue: row.venue?.trim() || '',
+          faculty: row.faculty?.trim() || '',
+        });
+      }
+
+      let updatedDays = 0;
+      for (const day of validDays) {
+        const slots = dayMap[day];
+        if (slots && slots.length > 0) {
+          await Timetable.findOneAndUpdate(
+            { batchId: targetBatchId, dayOfWeek: day },
+            { slots, uploadedBy: req.user._id },
+            { upsert: true, new: true }
+          );
+          updatedDays++;
+        }
+      }
+
+      const totalSlots = Object.values(dayMap).reduce((s, arr) => s + arr.length, 0);
+
+      return ok(res, {
+        autoDetected: 'timetable',
+        message: `📅 Timetable detected! Extracted ${totalSlots} class slots across ${updatedDays} days.`,
+        updatedDays,
+        totalSlots,
+        fileUrl,
+      }, 201);
+    }
+
+    // ── Exam Schedule detected ──
+    if (docType === 'exam_schedule' && targetBatchId && targetBatchId !== 'personal') {
+      const membership = await BatchMember.findOne({ batchId: targetBatchId, userId: req.user._id });
+      if (!membership || !['owner', 'moderator'].includes(membership.role)) {
+        return fail(res, 'Only batch owners or moderators can upload exam schedules. This PDF looks like an exam schedule.', 403);
+      }
+
+      const rows = await extractExamScheduleFromText(extractedText);
+      if (!rows || rows.length === 0) {
+        return fail(res, 'AI detected an exam schedule but could not extract entries. Try a clearer PDF.', 400);
+      }
+
+      // Build entries and insert
+      const entries = [];
+      for (const row of rows) {
+        const courseCode = row.course_code?.trim();
+        const rawDate = row.exam_date?.trim();
+        if (!courseCode || !rawDate) continue;
+        const examDate = new Date(rawDate);
+        if (isNaN(examDate.getTime())) continue;
+
+        entries.push({
+          batchId: targetBatchId,
+          courseCode: courseCode.toUpperCase(),
+          courseName: row.course_name?.trim() || '',
+          examDate,
+          examTime: row.exam_time?.trim() || '',
+          venue: row.venue?.trim() || '',
+          uploadedBy: req.user._id,
+          uploadedAt: new Date(),
+        });
+      }
+
+      if (entries.length === 0) {
+        return fail(res, 'AI detected an exam schedule but entries had invalid dates. Try a clearer PDF.', 400);
+      }
+
+      await ExamSchedule.deleteMany({ batchId: targetBatchId });
+      await ExamSchedule.insertMany(entries);
+
+      return ok(res, {
+        autoDetected: 'exam_schedule',
+        message: `📝 Exam schedule detected! Extracted ${entries.length} exam entries.`,
+        inserted: entries.length,
+        fileUrl,
+      }, 201);
+    }
+
+    // ── General document (existing pipeline) ──
     const extraction = await processUpload(fileUrl, batchId, req.user.uid);
 
-    // Create Post document
+    const resolvedTargetType = targetType === 'personal' ? 'personal' : 'batch';
+    const resolvedTargetBatchId = resolvedTargetType === 'batch' && targetBatchId ? targetBatchId : null;
+
     const post = await Post.create({
       batchId,
       uploadedBy: req.user._id,
@@ -51,6 +176,8 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
       priorityLevel: extraction.priorityLevel,
       verificationStatus: 'unverified',
       isDuplicate: false,
+      targetType: resolvedTargetType,
+      targetBatchId: resolvedTargetBatchId,
     });
 
     return ok(res, { post, extraction }, 201);
@@ -66,12 +193,16 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
  */
 router.post('/text', verifyFirebaseToken, async (req, res) => {
   try {
-    const { batchId, text } = req.body;
+    const { batchId, text, targetType, targetBatchId } = req.body;
     if (!batchId) return fail(res, 'batchId is required', 400);
     if (!text || !text.trim()) return fail(res, 'text is required', 400);
 
     // Run AI pipeline stub (no file, pass text)
     const extraction = await processUpload(null, batchId, req.user.uid, text);
+
+    // Determine target
+    const resolvedTargetType = targetType === 'personal' ? 'personal' : 'batch';
+    const resolvedTargetBatchId = resolvedTargetType === 'batch' && targetBatchId ? targetBatchId : null;
 
     // Create Post document
     const post = await Post.create({
@@ -88,6 +219,8 @@ router.post('/text', verifyFirebaseToken, async (req, res) => {
       priorityLevel: extraction.priorityLevel,
       verificationStatus: 'unverified',
       isDuplicate: false,
+      targetType: resolvedTargetType,
+      targetBatchId: resolvedTargetBatchId,
     });
 
     return ok(res, { post, extraction }, 201);

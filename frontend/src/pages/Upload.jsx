@@ -1,7 +1,6 @@
-import { useState, useRef } from 'react';
-import { Upload, FileText, CheckCircle, XCircle, Edit3, Loader2 } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Upload, FileText, CheckCircle, XCircle, Edit3, Loader2, Layers, User, ChevronDown, CalendarDays, BookOpen, Sparkles } from 'lucide-react';
 import api from '@/lib/api';
-import { useAuth } from '@/contexts/AuthContext';
 
 const PROGRESS_STEPS = [
   'Extracting text...',
@@ -11,18 +10,69 @@ const PROGRESS_STEPS = [
   'Creating entry...',
 ];
 
+// ── Batch Selector ─────────────────────────────────────────────────────────────
+function BatchSelector({ batches, value, onChange, loadingBatches }) {
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-foreground mb-1.5">
+        Upload For <span className="text-destructive">*</span>
+      </label>
+      <div className="relative">
+        <Layers size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        <select
+          id="upload-target"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full pl-9 pr-10 py-2.5 rounded-lg border border-border bg-background text-sm text-foreground focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none appearance-none cursor-pointer"
+          disabled={loadingBatches}
+        >
+          <option value="personal">📎 Personal Use (not shared)</option>
+          {batches.map((b) => (
+            <option key={b._id} value={b._id}>
+              🏫 {b.batchName}
+              {b.branch ? ` · ${b.branch}` : ''}
+              {b.semester ? ` · Sem ${b.semester}` : ''}
+            </option>
+          ))}
+        </select>
+        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+      </div>
+      {value !== 'personal' && batches.length > 0 && (
+        <p className="text-xs text-muted-foreground mt-1">
+          This will be shared with all members of the selected batch.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function UploadPage() {
-  const { user } = useAuth();
   const fileInputRef = useRef(null);
   const [mode, setMode] = useState('file'); // 'file' | 'text'
   const [file, setFile] = useState(null);
   const [text, setText] = useState('');
-  const [batchId, setBatchId] = useState('default-batch');
+  const [targetBatchId, setTargetBatchId] = useState('personal');
+  const [batches, setBatches] = useState([]);
+  const [loadingBatches, setLoadingBatches] = useState(true);
   const [loading, setLoading] = useState(false);
   const [progressStep, setProgressStep] = useState(-1);
-  const [result, setResult] = useState(null); // { post, extraction }
+  const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [finalized, setFinalized] = useState(false);
+
+  // Fetch user's batches on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/api/batch/my-batches');
+        setBatches(res.data || []);
+      } catch {
+        // If fetch fails, gracefully degrade to personal only
+      } finally {
+        setLoadingBatches(false);
+      }
+    })();
+  }, []);
 
   const handleFileChange = (e) => {
     const f = e.target.files?.[0];
@@ -35,19 +85,15 @@ export default function UploadPage() {
     if (f) setFile(f);
   };
 
-  const simulateProgress = () => {
-    return new Promise((resolve) => {
+  const simulateProgress = () =>
+    new Promise((resolve) => {
       let step = 0;
       const interval = setInterval(() => {
         setProgressStep(step);
         step++;
-        if (step >= PROGRESS_STEPS.length) {
-          clearInterval(interval);
-          resolve();
-        }
+        if (step >= PROGRESS_STEPS.length) { clearInterval(interval); resolve(); }
       }, 600);
     });
-  };
 
   const handleSubmit = async () => {
     setError('');
@@ -58,6 +104,15 @@ export default function UploadPage() {
 
     try {
       const progressPromise = simulateProgress();
+      const isPersonal = targetBatchId === 'personal';
+
+      // batchId is still required by the backend; use the real batch ID or a placeholder
+      const batchId = isPersonal ? 'personal' : targetBatchId;
+      const body = {
+        batchId,
+        targetType: isPersonal ? 'personal' : 'batch',
+        ...(isPersonal ? {} : { targetBatchId }),
+      };
 
       let response;
       if (mode === 'file') {
@@ -65,18 +120,27 @@ export default function UploadPage() {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('batchId', batchId);
+        formData.append('targetType', body.targetType);
+        if (!isPersonal) formData.append('targetBatchId', targetBatchId);
         response = await api.post('/api/upload/file', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
       } else {
         if (!text.trim()) { setError('Please enter text'); setLoading(false); return; }
-        response = await api.post('/api/upload/text', { batchId, text });
+        response = await api.post('/api/upload/text', { ...body, text });
       }
 
       await progressPromise;
-      setResult(response.data.data);
+      const responseData = response.data.data;
+
+      // Check if the backend auto-detected a timetable or exam schedule
+      if (responseData.autoDetected) {
+        setResult({ autoDetected: responseData.autoDetected, message: responseData.message, ...responseData });
+      } else {
+        setResult(responseData);
+      }
     } catch (err) {
-      setError(err.response?.data?.error || 'Upload failed');
+      setError(err.response?.data?.error || 'Upload failed. Please try again.');
     } finally {
       setLoading(false);
       setProgressStep(-1);
@@ -98,31 +162,25 @@ export default function UploadPage() {
     }
   };
 
-  const handleDiscard = () => {
-    setResult(null);
-    setFile(null);
-    setText('');
-  };
+  const handleDiscard = () => { setResult(null); setFile(null); setText(''); };
+  const resetAll = () => { setResult(null); setFile(null); setText(''); setFinalized(false); setError(''); };
 
-  const resetAll = () => {
-    setResult(null);
-    setFile(null);
-    setText('');
-    setFinalized(false);
-    setError('');
-  };
-
-  // ─── Finalized success state ───
-  if (finalized) {
+  // ── Auto-detected timetable/exam schedule success ───
+  if (result?.autoDetected) {
+    const isExam = result.autoDetected === 'exam_schedule';
+    const Icon = isExam ? BookOpen : CalendarDays;
     return (
       <div className="max-w-2xl mx-auto">
-        <div className="bg-green-50 border border-green-200 rounded-xl p-8 text-center space-y-4">
-          <CheckCircle className="mx-auto text-green-500" size={48} />
-          <h2 className="text-xl font-bold text-green-800">Entry Created Successfully!</h2>
-          <p className="text-green-700 text-sm">
-            A <span className="font-semibold">{result.extraction.category}</span> entry has been added and a calendar event was created.
-          </p>
-          <button onClick={resetAll} className="mt-4 px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+        <div className="bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900 rounded-2xl p-8 text-center space-y-4">
+          <div className="flex items-center justify-center gap-3">
+            <Sparkles className="text-purple-500" size={28} />
+            <Icon className="text-purple-500" size={40} />
+          </div>
+          <h2 className="text-xl font-bold text-purple-700 dark:text-purple-400">AI Auto-Detected!</h2>
+          <p className="text-purple-600 dark:text-purple-400 text-sm">{result.message}</p>
+          {result.totalSlots && <p className="text-xs text-muted-foreground">✅ {result.totalSlots} slots across {result.updatedDays} days saved to timetable</p>}
+          {result.inserted && <p className="text-xs text-muted-foreground">✅ {result.inserted} exam entries saved to schedule</p>}
+          <button onClick={resetAll} className="mt-4 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
             Upload Another
           </button>
         </div>
@@ -130,7 +188,28 @@ export default function UploadPage() {
     );
   }
 
-  // ─── Review card ───
+  // ── Finalized success ───
+  if (finalized) {
+    const targetBatch = batches.find((b) => b._id === targetBatchId);
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 rounded-2xl p-8 text-center space-y-4">
+          <CheckCircle className="mx-auto text-green-500" size={48} />
+          <h2 className="text-xl font-bold text-green-700 dark:text-green-400">Entry Created Successfully!</h2>
+          <p className="text-green-600 dark:text-green-500 text-sm">
+            A <span className="font-semibold">{result.extraction.category}</span> entry has been added
+            {targetBatch ? ` and shared with batch "${targetBatch.batchName}"` : ' to your personal records'}.
+            A calendar event was created automatically.
+          </p>
+          <button onClick={resetAll} className="mt-4 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
+            Upload Another
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Review card ───
   if (result) {
     const { extraction } = result;
     return (
@@ -158,23 +237,12 @@ export default function UploadPage() {
           </div>
 
           <div className="flex gap-3 mt-6">
-            <button
-              onClick={handleConfirm}
-              disabled={loading}
-              className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-            >
+            <button onClick={handleConfirm} disabled={loading}
+              className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50">
               <CheckCircle size={16} /> Confirm
             </button>
-            <button
-              onClick={() => alert('Edit mode coming in Phase 2!')}
-              className="flex items-center gap-2 px-5 py-2.5 border border-border rounded-lg hover:bg-accent transition-colors"
-            >
-              <Edit3 size={16} /> Edit
-            </button>
-            <button
-              onClick={handleDiscard}
-              className="flex items-center gap-2 px-5 py-2.5 border border-destructive/30 text-destructive rounded-lg hover:bg-destructive/10 transition-colors"
-            >
+            <button onClick={handleDiscard}
+              className="flex items-center gap-2 px-5 py-2.5 border border-destructive/30 text-destructive rounded-lg hover:bg-destructive/10 transition-colors">
               <XCircle size={16} /> Discard
             </button>
           </div>
@@ -183,7 +251,7 @@ export default function UploadPage() {
     );
   }
 
-  // ─── Upload form ───
+  // ── Upload form ───
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
@@ -199,32 +267,24 @@ export default function UploadPage() {
         </div>
       )}
 
+      {/* Batch selector — Feature 3 */}
+      <BatchSelector
+        batches={batches}
+        value={targetBatchId}
+        onChange={setTargetBatchId}
+        loadingBatches={loadingBatches}
+      />
+
       {/* Mode toggle */}
       <div className="flex gap-2">
-        <button
-          onClick={() => setMode('file')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'file' ? 'bg-primary text-white' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}
-        >
+        <button onClick={() => setMode('file')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'file' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
           File Upload
         </button>
-        <button
-          onClick={() => setMode('text')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'text' ? 'bg-primary text-white' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}
-        >
+        <button onClick={() => setMode('text')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'text' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
           Paste Text
         </button>
-      </div>
-
-      {/* Batch ID */}
-      <div>
-        <label className="block text-sm font-medium text-foreground mb-1">Batch ID</label>
-        <input
-          type="text"
-          value={batchId}
-          onChange={(e) => setBatchId(e.target.value)}
-          className="w-full px-4 py-2.5 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm"
-          placeholder="e.g., CSE-2025-A"
-        />
       </div>
 
       {mode === 'file' ? (
@@ -280,11 +340,14 @@ export default function UploadPage() {
       )}
 
       <button
+        id="upload-submit"
         onClick={handleSubmit}
         disabled={loading || (mode === 'file' && !file) || (mode === 'text' && !text.trim())}
-        className="w-full py-3 rounded-lg bg-primary text-white font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        className="w-full py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
-        {loading ? <><Loader2 size={18} className="animate-spin" /> Processing...</> : <><Upload size={18} /> Upload &amp; Process</>}
+        {loading
+          ? <><Loader2 size={18} className="animate-spin" /> Processing...</>
+          : <><Upload size={18} /> Upload &amp; Process</>}
       </button>
     </div>
   );

@@ -9,8 +9,26 @@ export default function PlacementsPage() {
 
   const fetchPlacements = async () => {
     try {
-      const res = await api.get('/api/placements', { params: { batchId: 'default-batch' } });
-      setPlacements(res.data.data || []);
+      // Get user's batches, then fetch placements for each
+      const batchRes = await api.get('/api/batch/my-batches').catch(() => ({ data: [] }));
+      const batches = batchRes.data || [];
+
+      if (batches.length === 0) {
+        // No batches — fetch all placements without batchId filter
+        const res = await api.get('/api/placements');
+        setPlacements(res.data.data || []);
+      } else {
+        // Fetch placements for each batch and merge
+        const allPlacements = [];
+        const seenIds = new Set();
+        for (const b of batches) {
+          const res = await api.get('/api/placements', { params: { batchId: b._id } });
+          for (const p of (res.data.data || [])) {
+            if (!seenIds.has(p._id)) { seenIds.add(p._id); allPlacements.push(p); }
+          }
+        }
+        setPlacements(allPlacements);
+      }
     } catch {
       // empty
     } finally {
@@ -19,6 +37,7 @@ export default function PlacementsPage() {
   };
 
   useEffect(() => { fetchPlacements(); }, []);
+
 
   const handleApply = async (id) => {
     setApplying(id);

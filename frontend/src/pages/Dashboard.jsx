@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { LayoutDashboard, AlertCircle, CalendarDays, Bot, Users, Sparkles, Loader2, Target, CheckCircle, Bell, ArrowRight, ClipboardList, BookOpen, Briefcase } from 'lucide-react';
+import { LayoutDashboard, AlertCircle, CalendarDays, Bot, Users, Sparkles, Loader2, Target, CheckCircle, Bell, ArrowRight, ClipboardList, BookOpen, Briefcase, X, UserCircle2 } from 'lucide-react';
 import api from '@/lib/api';
 import { Link } from 'react-router-dom';
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, dbUser } = useAuth();
   const [data, setData] = useState({ focusItems: [], urgentAlerts: [], counts: {} });
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -53,6 +53,23 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 max-w-6xl pb-10">
+      {/* Profile completion banner */}
+      {dbUser && dbUser.profileComplete === false && (
+        <div className="relative flex items-center gap-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+          <UserCircle2 size={20} className="text-amber-400 shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-amber-400">Your profile is incomplete</p>
+            <p className="text-xs text-amber-400/70">Complete your profile to get accurate eligibility checks and placement recommendations.</p>
+          </div>
+          <Link
+            to="/profile"
+            className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-white hover:bg-amber-400 transition-colors"
+          >
+            Complete Profile
+          </Link>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
