@@ -1,5 +1,5 @@
 import { extractTextFromFile } from '../config/textract.js';
-import { invokeModel } from '../config/bedrock.js';
+import { invokeAI } from '../config/gemini.js';
 import { calculatePriorityScore } from './priorityScore.js';
 import { Post } from '../models/Post.js';
 
@@ -199,7 +199,7 @@ export async function processUpload(fileUrl, batchId, uploadedBy, rawText = null
   let extraction;
   try {
     const noticePrompt = buildNoticeExtractionPrompt(extractedText);
-    const noticeResponse = await invokeModel(noticePrompt, 1024);
+    const noticeResponse = await invokeAI(noticePrompt, 1024);
     extraction = parseLLMResponse(noticeResponse, extractedText);
     console.log('[AI Pipeline] Notice extraction result:', JSON.stringify(extraction));
   } catch (err) {
@@ -214,7 +214,7 @@ export async function processUpload(fileUrl, batchId, uploadedBy, rawText = null
     console.log('[AI Pipeline] Calling Bedrock for placement-specific extraction...');
     try {
       const placementPrompt = buildPlacementExtractionPrompt(extractedText);
-      const placementResponse = await invokeModel(placementPrompt, 1024);
+      const placementResponse = await invokeAI(placementPrompt, 1024);
       const placementFields = parseLLMResponse(placementResponse, extractedText);
       // Merge placement fields into extraction
       Object.assign(extraction, {

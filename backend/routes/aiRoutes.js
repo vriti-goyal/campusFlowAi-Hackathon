@@ -9,7 +9,7 @@ import { CalendarEvent } from '../models/CalendarEvent.js';
 import { Post } from '../models/Post.js';
 import { Timetable } from '../models/Timetable.js';
 import { BatchMember } from '../models/BatchMember.js';
-import { invokeTitan } from '../config/bedrock.js';
+import { invokeAI } from '../config/gemini.js';
 
 const router = express.Router();
 
@@ -239,7 +239,7 @@ router.post('/ask', async (req, res) => {
     const prompt = buildAssistantPrompt(question, context);
 
     // Call Bedrock
-    const rawAnswer = await invokeTitan(prompt, 400);
+    const rawAnswer = await invokeAI(prompt, 400);
 
     // Parse response: split answer from "Sources:" section
     let answer = rawAnswer;
@@ -296,7 +296,7 @@ router.post('/daily-digest', async (req, res) => {
     const context = await gatherDigestContext(req.user);
 
     const prompt = buildDigestPrompt(context);
-    const digestText = await invokeTitan(prompt, 200);
+    const digestText = await invokeAI(prompt, 200);
 
     res.json({ digestText: digestText.trim() });
   } catch (error) {

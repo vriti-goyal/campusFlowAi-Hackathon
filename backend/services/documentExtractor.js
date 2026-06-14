@@ -4,7 +4,7 @@
  * Shared AI service that takes raw text (extracted from PDF via Textract)
  * and uses Bedrock to parse it into structured timetable or exam schedule data.
  */
-import { invokeModel } from '../config/bedrock.js';
+import { invokeAI } from '../config/gemini.js';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -72,7 +72,7 @@ Rules:
 export async function extractTimetableFromText(text) {
   console.log('[DocumentExtractor] Extracting timetable from text, length:', text.length);
 
-  const response = await invokeModel(TIMETABLE_PROMPT(text), 2048);
+  const response = await invokeAI(TIMETABLE_PROMPT(text), 2048);
   const parsed = parseLLMJSON(response);
 
   if (!parsed || !Array.isArray(parsed)) {
@@ -134,7 +134,7 @@ Rules:
 export async function extractExamScheduleFromText(text) {
   console.log('[DocumentExtractor] Extracting exam schedule from text, length:', text.length);
 
-  const response = await invokeModel(EXAM_SCHEDULE_PROMPT(text), 2048);
+  const response = await invokeAI(EXAM_SCHEDULE_PROMPT(text), 2048);
   const parsed = parseLLMJSON(response);
 
   if (!parsed || !Array.isArray(parsed)) {

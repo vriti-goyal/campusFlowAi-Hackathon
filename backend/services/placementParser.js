@@ -1,4 +1,4 @@
-import { invokeModel } from '../config/bedrock.js';
+import { invokeAI } from '../config/gemini.js';
 
 /**
  * PLACEMENT_KEYWORDS — used to filter relevant emails from inbox.
@@ -54,7 +54,7 @@ Email body:
 ${rawBody.slice(0, 4000)}`; // Truncate to avoid token limits
 
   try {
-    const rawOutput = await invokeModel(systemPrompt, 600);
+    const rawOutput = await invokeAI(systemPrompt, 600);
 
     // Strip markdown code fences if the model adds them
     const cleaned = rawOutput
@@ -230,7 +230,7 @@ Return ONLY a valid JSON object with no extra text:
 }`;
 
   try {
-    const rawOutput = await invokeModel(prompt, 700);
+    const rawOutput = await invokeAI(prompt, 700);
 
     const cleaned = rawOutput
       .replace(/```json\s*/gi, '')
