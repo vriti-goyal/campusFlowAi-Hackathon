@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const postSchema = new mongoose.Schema(
   {
-    batchId: { type: String, required: true },
+    batchId: { type: String, required: false, default: null },
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     type: { type: String, default: 'general' },
     title: { type: String, default: '' },
