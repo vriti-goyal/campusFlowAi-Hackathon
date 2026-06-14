@@ -1,45 +1,30 @@
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export async function extractTextFromBuffer(buffer, mimetype) {
   try {
-    if (mimetype === 'application/pdf') {
-      // Use createRequire to load CommonJS pdf-parse in ESM context
-      const pdfParse = require('pdf-parse');
-      const data = await pdfParse(buffer);
-      const text = data.text?.trim();
-      if (text && text.length >= 30) return text;
-      // Fallback: raw binary string extraction
-      return extractTextFallback(buffer);
-    }
+    // Send file directly to Gemini Vision — works for both PDF and images
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-    // Images — Tesseract OCR
-    const { createWorker } = await import('tesseract.js');
-    const worker = await createWorker('eng');
-    const { data: { text } } = await worker.recognize(buffer);
-    await worker.terminate();
-    return text?.trim() || '';
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: mimetype,  // 'application/pdf' or 'image/jpeg' etc
+          data: buffer.toString('base64'),
+        },
+      },
+      {
+        text: 'Extract ALL text content from this document exactly as it appears. Return only the raw text, no formatting, no explanation.',
+      },
+    ]);
+
+    const extracted = result.response.text()?.trim();
+    console.log('[ExtractText] Gemini Vision extracted:', extracted?.slice(0, 200));
+    return extracted || '';
 
   } catch (err) {
-    console.error('[ExtractText] Error:', err.message);
-    // Never throw — always return something so upload continues
-    return extractTextFallback(buffer);
-  }
-}
-
-function extractTextFallback(buffer) {
-  try {
-    const str = buffer.toString('latin1');
-    const matches = str.match(/BT[\s\S]*?ET/g) || [];
-    const text = matches
-      .join(' ')
-      .replace(/[^\x20-\x7E\n]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (text.length > 30) return text;
-    const readable = (str.match(/[a-zA-Z0-9 .,:\-\/()]{4,}/g) || []).join(' ').trim();
-    return readable;
-  } catch {
+    console.error('[ExtractText] Gemini Vision failed:', err.message);
     return '';
   }
 }
