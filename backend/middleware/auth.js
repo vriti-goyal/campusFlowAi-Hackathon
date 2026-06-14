@@ -1,12 +1,5 @@
-import admin from 'firebase-admin';
+import admin from '../config/firebase.js';
 import { User } from '../models/User.js';
-
-// Initialize Firebase Admin once
-if (!admin.apps.length) {
-  admin.initializeApp({
-    projectId: process.env.FIREBASE_PROJECT_ID,
-  });
-}
 
 /**
  * Express middleware — verifies a Firebase ID token passed as
