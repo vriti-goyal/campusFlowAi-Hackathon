@@ -4,6 +4,7 @@ import { verifyFirebaseToken } from '../middleware/auth.js';
 import { uploadToS3 } from '../config/s3.js';
 import { invokeAIVision } from '../config/gemini.js';
 import { processUpload } from '../services/aiPipeline.js';
+import { routeDocument } from '../services/documentRouter.js';
 import { detectDocumentType, extractTimetableFromText, extractExamScheduleFromText, extractTimetableUpdateFromText } from '../services/documentExtractor.js';
 import { Post } from '../models/Post.js';
 import { Timetable } from '../models/Timetable.js';
@@ -31,9 +32,9 @@ const upload = multer({
  * POST /api/upload/file
  * Multipart file upload → S3 → AI pipeline → create Post
  *
- * NEW: Auto-detects timetable & exam schedule PDFs.
- * If detected, routes to timetable/exam-schedule storage instead of creating a Post.
- * Requires targetBatchId for timetable/exam auto-routing.
+ * Uses DocumentClassifier → CourseFilter → DocumentIntelligenceRouter pipeline.
+ * Multi-category classification routes documents to appropriate modules.
+ * Falls back to general Post creation for unclassified documents.
  */
 router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res) => {
   try {
@@ -45,7 +46,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
     // Upload to S3
     const fileUrl = await uploadToS3(req.file.buffer, req.file.originalname, req.file.mimetype);
 
-    // Extract text via Gemini Vision for document type detection
+    // Extract text via Gemini Vision for document classification
     let extractedText = '';
     try {
       extractedText = await invokeAIVision(req.file.buffer, req.file.mimetype);
@@ -156,7 +157,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
               adminName: 'AI Notice Detector',
               changeType: 'permanent',
               reason: update.reason || 'Notice Upload',
-              description: \`AI Permanent Update for \${update.course_code}: \${update.override_type}\`
+              description: `AI Permanent Update for ${update.course_code}: ${update.override_type}`
             });
           } else {
             // Temporary Override
@@ -176,7 +177,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
               adminName: 'AI Notice Detector',
               changeType: 'temporary',
               reason: update.reason || 'Notice Upload',
-              description: \`AI Temporary Override for \${update.course_code} on \${update.date}: \${update.override_type}\`
+              description: `AI Temporary Override for ${update.course_code} on ${update.date}: ${update.override_type}`
             });
           }
 
@@ -185,8 +186,8 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
           const notifications = members.map(m => ({
             userId: m.userId,
             batchId: targetBatchId,
-            title: \`Class \${update.override_type.toUpperCase()}\`,
-            message: \`\${update.course_code} has been \${update.override_type.replace('_', ' ')} for \${update.date}.\`,
+            title: `Class ${update.override_type.toUpperCase()}`,
+            message: `${update.course_code} has been ${update.override_type.replace('_', ' ')} for ${update.date}.`,
             type: 'announcement'
           }));
           
@@ -200,7 +201,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
 
       return ok(res, {
         autoDetected: 'timetable_update',
-        message: \`🔄 Timetable update detected! Processed \${processedUpdates} modifications.\`,
+        message: `🔄 Timetable update detected! Processed ${processedUpdates} modifications.`,
         processedUpdates,
         fileUrl,
       }, 201);
@@ -254,7 +255,44 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
       }, 201);
     }
 
-    // ── General document (existing pipeline) ──
+    // Determine routing batchId: prefer targetBatchId when available and not 'personal'
+    const routingBatchId = (targetBatchId && targetBatchId !== 'personal') ? targetBatchId : batchId;
+
+    // ── Route through DocumentIntelligenceRouter pipeline ──
+    if (extractedText) {
+      try {
+        const routeResult = await routeDocument({
+          text: extractedText,
+          userId: req.user._id,
+          batchId: routingBatchId,
+          fileUrl,
+          user: req.user,
+        });
+
+        // Determine if we should fall back to general Post creation:
+        // 1. categories is ['general'] (classification fallback or all extractions/routing failed)
+        // 2. routing.general has status 'fallback' (all routing failed in Step 6)
+        // 3. ALL routing entries have status 'failed' (independent safety check)
+        const categories = routeResult?.data?.categories || [];
+        const isGeneralFallback = categories.length === 1 && categories[0] === 'general';
+        const allRoutingFailed = routeResult?.data?.routing?.general?.status === 'fallback';
+
+        // Independent check: if every routing entry has status 'failed', treat as all-failed
+        const routingEntries = Object.values(routeResult?.data?.routing || {});
+        const allEntriesFailed = routingEntries.length > 0 &&
+          routingEntries.every((r) => r.status === 'failed');
+
+        if (!isGeneralFallback && !allRoutingFailed && !allEntriesFailed) {
+          // Return enhanced multi-category response from the router
+          return ok(res, routeResult.data, 201);
+        }
+      } catch (routeErr) {
+        console.error('[Upload] DocumentRouter failed, falling back to general pipeline:', routeErr.message);
+        // Fall through to general Post creation below
+      }
+    }
+
+    // ── General document fallback (existing pipeline) ──
     const extraction = await processUpload(fileUrl, batchId, req.user.uid, extractedText);
 
     const resolvedTargetType = targetType === 'personal' ? 'personal' : 'batch';
@@ -287,7 +325,9 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
 
 /**
  * POST /api/upload/text
- * Text input → AI pipeline stub → create Post
+ * Text input → DocumentClassifier → CourseFilter → DocumentIntelligenceRouter pipeline.
+ * Multi-category classification routes text to appropriate modules.
+ * Falls back to general Post creation for unclassified or "general" fallback documents.
  */
 router.post('/text', verifyFirebaseToken, async (req, res) => {
   try {
@@ -295,14 +335,41 @@ router.post('/text', verifyFirebaseToken, async (req, res) => {
     if (!batchId) return fail(res, 'batchId is required', 400);
     if (!text || !text.trim()) return fail(res, 'text is required', 400);
 
-    // Run AI pipeline stub (no file, pass text)
+    // Determine routing batchId: prefer targetBatchId when available and not 'personal'
+    const routingBatchId = (targetBatchId && targetBatchId !== 'personal') ? targetBatchId : batchId;
+
+    // ── Route through DocumentIntelligenceRouter pipeline ──
+    try {
+      const routeResult = await routeDocument({
+        text,
+        userId: req.user._id,
+        batchId: routingBatchId,
+        fileUrl: '',
+        user: req.user,
+      });
+
+      // Determine if we should fall back to general Post creation:
+      const categories = routeResult?.data?.categories || [];
+      const isGeneralFallback = categories.length === 1 && categories[0] === 'general';
+      const allRoutingFailed = routeResult?.data?.routing?.general?.status === 'fallback';
+
+      const routingEntries = Object.values(routeResult?.data?.routing || {});
+      const allEntriesFailed = routingEntries.length > 0 &&
+        routingEntries.every((r) => r.status === 'failed');
+
+      if (!isGeneralFallback && !allRoutingFailed && !allEntriesFailed) {
+        return ok(res, routeResult.data, 201);
+      }
+    } catch (routeErr) {
+      console.error('[Upload] DocumentRouter failed for text, falling back to general pipeline:', routeErr.message);
+    }
+
+    // ── General document fallback (existing pipeline) ──
     const extraction = await processUpload(null, batchId, req.user.uid, text);
 
-    // Determine target
     const resolvedTargetType = targetType === 'personal' ? 'personal' : 'batch';
     const resolvedTargetBatchId = resolvedTargetType === 'batch' && targetBatchId ? targetBatchId : null;
 
-    // Create Post document
     const post = await Post.create({
       batchId,
       uploadedBy: req.user._id,

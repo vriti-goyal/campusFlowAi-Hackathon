@@ -26,4 +26,6 @@ const timetableOverrideSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+timetableOverrideSchema.index({ batchId: 1, date: 1 });
+
 export const TimetableOverride = mongoose.model('TimetableOverride', timetableOverrideSchema);
