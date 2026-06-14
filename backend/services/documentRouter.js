@@ -14,7 +14,7 @@ import { calculatePriorityScore } from './priorityScore.js';
  * Called from upload.js for both file and text uploads.
  * Routes to Assignment, Placement, or falls back to general Post.
  */
-export async function routeDocument({ text, userId, batchId, fileUrl, user }) {
+export async function routeDocument({ text, userId, batchId, fileUrl, user, targetType, targetBatchId }) {
   try {
     // Step 1: Classify document type
     const docType = detectDocumentType(text);
@@ -23,10 +23,10 @@ export async function routeDocument({ text, userId, batchId, fileUrl, user }) {
     // Step 2: Route based on type
     switch (docType) {
       case 'assignment':
-        return await handleAssignment({ text, userId, batchId, fileUrl });
+        return await handleAssignment({ text, userId, batchId, fileUrl, targetType, targetBatchId });
 
       case 'placement':
-        return await handlePlacement({ text, userId, batchId, fileUrl, user });
+        return await handlePlacement({ text, userId, batchId, fileUrl, user, targetType, targetBatchId });
 
       case 'general':
       default:
@@ -52,7 +52,7 @@ export async function routeDocument({ text, userId, batchId, fileUrl, user }) {
 
 // ── Assignment Handler ───────────────────────────────────────────────
 
-async function handleAssignment({ text, userId, batchId, fileUrl }) {
+async function handleAssignment({ text, userId, batchId, fileUrl, targetType, targetBatchId }) {
   console.log('[Router] Handling as assignment');
 
   const extracted = await extractAssignmentFromText(text);
@@ -88,6 +88,8 @@ async function handleAssignment({ text, userId, batchId, fileUrl }) {
     priorityLevel,
     verificationStatus: 'unverified',
     isDuplicate: false,
+    targetType: targetType || 'batch',
+    targetBatchId: targetBatchId || null,
   });
 
   // Create Assignment
@@ -145,7 +147,7 @@ async function handleAssignment({ text, userId, batchId, fileUrl }) {
 
 // ── Placement Handler ────────────────────────────────────────────────
 
-async function handlePlacement({ text, userId, batchId, fileUrl, user }) {
+async function handlePlacement({ text, userId, batchId, fileUrl, user, targetType, targetBatchId }) {
   console.log('[Router] Handling as placement');
 
   const extracted = await extractPlacementFromText(text);
@@ -181,6 +183,8 @@ async function handlePlacement({ text, userId, batchId, fileUrl, user }) {
     priorityLevel,
     verificationStatus: 'unverified',
     isDuplicate: false,
+    targetType: targetType || 'batch',
+    targetBatchId: targetBatchId || null,
   });
 
   // Create Placement

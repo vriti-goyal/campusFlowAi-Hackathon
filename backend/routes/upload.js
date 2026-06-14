@@ -258,8 +258,11 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
       }, 201);
     }
 
+    const resolvedTargetType = targetType === 'personal' ? 'personal' : 'batch';
+    const finalTargetBatchId = resolvedTargetType === 'batch' && resolvedTargetBatchId ? resolvedTargetBatchId : null;
+
     // Determine routing batchId: prefer targetBatchId when available and not 'personal'
-    const routingBatchId = (targetBatchId && targetBatchId !== 'personal') ? targetBatchId : batchId;
+    const routingBatchId = finalTargetBatchId ? finalTargetBatchId : resolvedBatchId;
 
     // ── Route through DocumentIntelligenceRouter pipeline ──
     if (extractedText) {
@@ -270,6 +273,8 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
           batchId: routingBatchId,
           fileUrl,
           user: req.user,
+          targetType: resolvedTargetType,
+          targetBatchId: finalTargetBatchId,
         });
 
         // Determine if we should fall back to general Post creation:
@@ -296,10 +301,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
     }
 
     // ── General document fallback (existing pipeline) ──
-    const extraction = await processUpload(fileUrl, resolvedBatchId, req.user.uid, extractedText);
-
-    const resolvedTargetType = targetType === 'personal' ? 'personal' : 'batch';
-    const finalTargetBatchId = resolvedTargetType === 'batch' && resolvedTargetBatchId ? resolvedTargetBatchId : null;
+    const extraction = await processUpload(fileUrl, resolvedBatchId, req.user._id, extractedText);
 
     const post = await Post.create({
       batchId: resolvedBatchId,
@@ -341,8 +343,11 @@ router.post('/text', verifyFirebaseToken, async (req, res) => {
     const resolvedBatchId = (batchId && batchId !== 'personal') ? batchId : null;
     const resolvedTargetBatchId = (targetBatchId && targetBatchId !== 'personal') ? targetBatchId : null;
 
+    const resolvedTargetType = targetType === 'personal' ? 'personal' : 'batch';
+    const finalTargetBatchId = resolvedTargetType === 'batch' && resolvedTargetBatchId ? resolvedTargetBatchId : null;
+
     // Determine routing batchId: prefer targetBatchId when available and not 'personal'
-    const routingBatchId = resolvedTargetBatchId ? resolvedTargetBatchId : resolvedBatchId;
+    const routingBatchId = finalTargetBatchId ? finalTargetBatchId : resolvedBatchId;
 
     // ── Route through DocumentIntelligenceRouter pipeline ──
     try {
@@ -352,6 +357,8 @@ router.post('/text', verifyFirebaseToken, async (req, res) => {
         batchId: routingBatchId,
         fileUrl: '',
         user: req.user,
+        targetType: resolvedTargetType,
+        targetBatchId: finalTargetBatchId,
       });
 
       // Determine if we should fall back to general Post creation:
@@ -371,10 +378,7 @@ router.post('/text', verifyFirebaseToken, async (req, res) => {
     }
 
     // ── General document fallback (existing pipeline) ──
-    const extraction = await processUpload(null, resolvedBatchId, req.user.uid, text);
-
-    const resolvedTargetType = targetType === 'personal' ? 'personal' : 'batch';
-    const finalTargetBatchId = resolvedTargetType === 'batch' && resolvedTargetBatchId ? resolvedTargetBatchId : null;
+    const extraction = await processUpload(null, resolvedBatchId, req.user._id, text);
 
     const post = await Post.create({
       batchId: resolvedBatchId,
