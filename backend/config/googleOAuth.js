@@ -8,10 +8,11 @@ export function getOAuthClient() {
   );
 }
 
-export function getAuthUrl(oauthClient) {
+export function getAuthUrl(oauthClient, userId) {
   return oauthClient.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
+    state: userId,
     scope: [
       'https://www.googleapis.com/auth/gmail.readonly',
       'https://www.googleapis.com/auth/userinfo.email',

@@ -9,13 +9,14 @@ import { google } from 'googleapis';
 import { invokeAI } from '../config/gemini.js';
 import { calculatePriorityScore } from '../services/priorityScore.js';
 import { createNotification } from '../services/notificationService.js';
+import { verifyFirebaseToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.get('/auth-url', (req, res) => {
+router.get('/auth-url', verifyFirebaseToken, (req, res) => {
   try {
     const oauthClient = getOAuthClient();
-    const authUrl = getAuthUrl(oauthClient);
+    const authUrl = getAuthUrl(oauthClient, req.user._id.toString());
     res.json({ authUrl });
   } catch (err) {
     res.status(500).json({ error: 'Failed to generate auth url' });
@@ -23,9 +24,9 @@ router.get('/auth-url', (req, res) => {
 });
 
 router.get('/callback', async (req, res) => {
-  const { code } = req.query;
+  const { code, state } = req.query;
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  if (!code) return res.redirect(`${frontendUrl}/placements?gmail=error`);
+  if (!code || !state) return res.redirect(`${frontendUrl}/placements?gmail=error`);
 
   try {
     const oauthClient = getOAuthClient();
@@ -35,10 +36,13 @@ router.get('/callback', async (req, res) => {
     const oauth2 = google.oauth2({ auth: oauthClient, version: 'v2' });
     const userInfo = await oauth2.userinfo.get();
     
+    // state contains the user's MongoDB _id passed from /auth-url
+    const userId = state;
+
     await GmailToken.findOneAndUpdate(
-      { userId: req.user._id },
+      { userId },
       {
-        userId: req.user._id,
+        userId,
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token || undefined,
         expiryDate: tokens.expiry_date,
@@ -55,7 +59,7 @@ router.get('/callback', async (req, res) => {
   }
 });
 
-router.get('/status', async (req, res) => {
+router.get('/status', verifyFirebaseToken, async (req, res) => {
   try {
     const token = await GmailToken.findOne({ userId: req.user._id });
     if (!token) return res.json({ connected: false, email: null, lastSync: null });
@@ -67,7 +71,7 @@ router.get('/status', async (req, res) => {
   }
 });
 
-router.post('/sync', async (req, res) => {
+router.post('/sync', verifyFirebaseToken, async (req, res) => {
   try {
     const tokenDoc = await GmailToken.findOne({ userId: req.user._id });
     if (!tokenDoc) return res.status(400).json({ error: 'Gmail not connected' });
