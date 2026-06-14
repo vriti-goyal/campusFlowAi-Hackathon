@@ -4,11 +4,8 @@ import { verifyFirebaseToken } from '../middleware/auth.js';
 import { uploadToS3 } from '../config/s3.js';
 import { invokeAIVision } from '../config/gemini.js';
 import { processUpload } from '../services/aiPipeline.js';
-import { detectDocumentType, extractTimetableFromText, extractExamScheduleFromText } from '../services/documentExtractor.js';
+import { routeDocument } from '../services/documentRouter.js';
 import { Post } from '../models/Post.js';
-import { Timetable } from '../models/Timetable.js';
-import { ExamSchedule } from '../models/ExamSchedule.js';
-import { BatchMember } from '../models/BatchMember.js';
 import { ok, fail } from '../utils/response.js';
 
 const router = Router();
@@ -28,9 +25,9 @@ const upload = multer({
  * POST /api/upload/file
  * Multipart file upload → S3 → AI pipeline → create Post
  *
- * NEW: Auto-detects timetable & exam schedule PDFs.
- * If detected, routes to timetable/exam-schedule storage instead of creating a Post.
- * Requires targetBatchId for timetable/exam auto-routing.
+ * Uses DocumentClassifier → CourseFilter → DocumentIntelligenceRouter pipeline.
+ * Multi-category classification routes documents to appropriate modules.
+ * Falls back to general Post creation for unclassified documents.
  */
 router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res) => {
   try {
@@ -42,7 +39,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
     // Upload to S3
     const fileUrl = await uploadToS3(req.file.buffer, req.file.originalname, req.file.mimetype);
 
-    // Extract text via Gemini Vision for document type detection
+    // Extract text via Gemini Vision for document classification
     let extractedText = '';
     try {
       extractedText = await invokeAIVision(req.file.buffer, req.file.mimetype);
@@ -50,113 +47,44 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
       console.error('[Upload] Vision extraction failed:', err.message);
     }
 
-    // ── Auto-detect document type ──
-    const docType = extractedText ? detectDocumentType(extractedText) : 'general';
-    console.log(`[Upload] Detected document type: ${docType}`);
+    // Determine routing batchId: prefer targetBatchId when available and not 'personal'
+    const routingBatchId = (targetBatchId && targetBatchId !== 'personal') ? targetBatchId : batchId;
 
-    // ── Timetable detected ──
-    if (docType === 'timetable' && targetBatchId && targetBatchId !== 'personal') {
-      // Verify admin access
-      const membership = await BatchMember.findOne({ batchId: targetBatchId, userId: req.user._id });
-      if (!membership || !['owner', 'moderator'].includes(membership.role)) {
-        return fail(res, 'Only batch owners or moderators can upload timetables. This PDF looks like a timetable.', 403);
-      }
-
-      const rows = await extractTimetableFromText(extractedText);
-      if (!rows || rows.length === 0) {
-        return fail(res, 'AI detected a timetable but could not extract entries. Try a clearer PDF.', 400);
-      }
-
-      // Build day map and upsert
-      const validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      const dayMap = {};
-      for (const row of rows) {
-        const rawDay = row.day?.trim() || '';
-        const dayStr = rawDay.charAt(0).toUpperCase() + rawDay.slice(1).toLowerCase();
-        if (!validDays.includes(dayStr)) continue;
-        if (!dayMap[dayStr]) dayMap[dayStr] = [];
-        dayMap[dayStr].push({
-          time: row.time?.trim() || '',
-          courseCode: (row.course_code || '').trim().toUpperCase(),
-          courseName: (row.course_name || '').trim(),
-          venue: row.venue?.trim() || '',
-          faculty: row.faculty?.trim() || '',
+    // ── Route through DocumentIntelligenceRouter pipeline ──
+    if (extractedText) {
+      try {
+        const routeResult = await routeDocument({
+          text: extractedText,
+          userId: req.user._id,
+          batchId: routingBatchId,
+          fileUrl,
+          user: req.user,
         });
-      }
 
-      let updatedDays = 0;
-      for (const day of validDays) {
-        const slots = dayMap[day];
-        if (slots && slots.length > 0) {
-          await Timetable.findOneAndUpdate(
-            { batchId: targetBatchId, dayOfWeek: day },
-            { slots, uploadedBy: req.user._id },
-            { upsert: true, new: true }
-          );
-          updatedDays++;
+        // Determine if we should fall back to general Post creation:
+        // 1. categories is ['general'] (classification fallback or all extractions/routing failed)
+        // 2. routing.general has status 'fallback' (all routing failed in Step 6)
+        // 3. ALL routing entries have status 'failed' (independent safety check)
+        const categories = routeResult?.data?.categories || [];
+        const isGeneralFallback = categories.length === 1 && categories[0] === 'general';
+        const allRoutingFailed = routeResult?.data?.routing?.general?.status === 'fallback';
+
+        // Independent check: if every routing entry has status 'failed', treat as all-failed
+        const routingEntries = Object.values(routeResult?.data?.routing || {});
+        const allEntriesFailed = routingEntries.length > 0 &&
+          routingEntries.every((r) => r.status === 'failed');
+
+        if (!isGeneralFallback && !allRoutingFailed && !allEntriesFailed) {
+          // Return enhanced multi-category response from the router
+          return ok(res, routeResult.data, 201);
         }
+      } catch (routeErr) {
+        console.error('[Upload] DocumentRouter failed, falling back to general pipeline:', routeErr.message);
+        // Fall through to general Post creation below
       }
-
-      const totalSlots = Object.values(dayMap).reduce((s, arr) => s + arr.length, 0);
-
-      return ok(res, {
-        autoDetected: 'timetable',
-        message: `📅 Timetable detected! Extracted ${totalSlots} class slots across ${updatedDays} days.`,
-        updatedDays,
-        totalSlots,
-        fileUrl,
-      }, 201);
     }
 
-    // ── Exam Schedule detected ──
-    if (docType === 'exam_schedule' && targetBatchId && targetBatchId !== 'personal') {
-      const membership = await BatchMember.findOne({ batchId: targetBatchId, userId: req.user._id });
-      if (!membership || !['owner', 'moderator'].includes(membership.role)) {
-        return fail(res, 'Only batch owners or moderators can upload exam schedules. This PDF looks like an exam schedule.', 403);
-      }
-
-      const rows = await extractExamScheduleFromText(extractedText);
-      if (!rows || rows.length === 0) {
-        return fail(res, 'AI detected an exam schedule but could not extract entries. Try a clearer PDF.', 400);
-      }
-
-      // Build entries and insert
-      const entries = [];
-      for (const row of rows) {
-        const courseCode = row.course_code?.trim();
-        const rawDate = row.exam_date?.trim();
-        if (!courseCode || !rawDate) continue;
-        const examDate = new Date(rawDate);
-        if (isNaN(examDate.getTime())) continue;
-
-        entries.push({
-          batchId: targetBatchId,
-          courseCode: courseCode.toUpperCase(),
-          courseName: row.course_name?.trim() || '',
-          examDate,
-          examTime: row.exam_time?.trim() || '',
-          venue: row.venue?.trim() || '',
-          uploadedBy: req.user._id,
-          uploadedAt: new Date(),
-        });
-      }
-
-      if (entries.length === 0) {
-        return fail(res, 'AI detected an exam schedule but entries had invalid dates. Try a clearer PDF.', 400);
-      }
-
-      await ExamSchedule.deleteMany({ batchId: targetBatchId });
-      await ExamSchedule.insertMany(entries);
-
-      return ok(res, {
-        autoDetected: 'exam_schedule',
-        message: `📝 Exam schedule detected! Extracted ${entries.length} exam entries.`,
-        inserted: entries.length,
-        fileUrl,
-      }, 201);
-    }
-
-    // ── General document (existing pipeline) ──
+    // ── General document fallback (existing pipeline) ──
     const extraction = await processUpload(fileUrl, batchId, req.user.uid, extractedText);
 
     const resolvedTargetType = targetType === 'personal' ? 'personal' : 'batch';
@@ -189,7 +117,9 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
 
 /**
  * POST /api/upload/text
- * Text input → AI pipeline stub → create Post
+ * Text input → DocumentClassifier → CourseFilter → DocumentIntelligenceRouter pipeline.
+ * Multi-category classification routes text to appropriate modules.
+ * Falls back to general Post creation for unclassified or "general" fallback documents.
  */
 router.post('/text', verifyFirebaseToken, async (req, res) => {
   try {
@@ -197,14 +127,47 @@ router.post('/text', verifyFirebaseToken, async (req, res) => {
     if (!batchId) return fail(res, 'batchId is required', 400);
     if (!text || !text.trim()) return fail(res, 'text is required', 400);
 
-    // Run AI pipeline stub (no file, pass text)
+    // Determine routing batchId: prefer targetBatchId when available and not 'personal'
+    const routingBatchId = (targetBatchId && targetBatchId !== 'personal') ? targetBatchId : batchId;
+
+    // ── Route through DocumentIntelligenceRouter pipeline ──
+    try {
+      const routeResult = await routeDocument({
+        text,
+        userId: req.user._id,
+        batchId: routingBatchId,
+        fileUrl: '',
+        user: req.user,
+      });
+
+      // Determine if we should fall back to general Post creation:
+      // 1. categories is ['general'] (classification fallback or all extractions/routing failed)
+      // 2. routing.general has status 'fallback' (all routing failed in Step 6)
+      // 3. ALL routing entries have status 'failed' (independent safety check)
+      const categories = routeResult?.data?.categories || [];
+      const isGeneralFallback = categories.length === 1 && categories[0] === 'general';
+      const allRoutingFailed = routeResult?.data?.routing?.general?.status === 'fallback';
+
+      // Independent check: if every routing entry has status 'failed', treat as all-failed
+      const routingEntries = Object.values(routeResult?.data?.routing || {});
+      const allEntriesFailed = routingEntries.length > 0 &&
+        routingEntries.every((r) => r.status === 'failed');
+
+      if (!isGeneralFallback && !allRoutingFailed && !allEntriesFailed) {
+        // Return enhanced multi-category response from the router
+        return ok(res, routeResult.data, 201);
+      }
+    } catch (routeErr) {
+      console.error('[Upload] DocumentRouter failed for text, falling back to general pipeline:', routeErr.message);
+      // Fall through to general Post creation below
+    }
+
+    // ── General document fallback (existing pipeline) ──
     const extraction = await processUpload(null, batchId, req.user.uid, text);
 
-    // Determine target
     const resolvedTargetType = targetType === 'personal' ? 'personal' : 'batch';
     const resolvedTargetBatchId = resolvedTargetType === 'batch' && targetBatchId ? targetBatchId : null;
 
-    // Create Post document
     const post = await Post.create({
       batchId,
       uploadedBy: req.user._id,

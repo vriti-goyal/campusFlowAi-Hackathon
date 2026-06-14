@@ -13,6 +13,13 @@ const assignmentSchema = new mongoose.Schema(
     priorityLevel: { type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'medium' },
     status: { type: String, enum: ['Not Started', 'In Progress', 'Submitted', 'Missed', 'Pending', 'Late'], default: 'Not Started' },
     actionRequired: { type: String, default: '' },
+    questions: [{ type: String }],
+    instructions: { type: String, default: '' },
+    marksAllocation: { type: String, default: '' },
+    faculty: { type: String, default: '' },
+    fileUrl: { type: String, default: '' },
+    extractedFrom: { type: String, default: '' },
+    deadlineUnknown: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
