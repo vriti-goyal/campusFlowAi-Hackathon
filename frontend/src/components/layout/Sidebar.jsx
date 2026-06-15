@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   Zap, Sun, Moon, LayoutDashboard, FileText, 
@@ -72,12 +72,12 @@ const Sidebar = ({ isOpen, setOpen }) => {
       >
         {/* Top: Logo & Theme Toggle */}
         <div className="flex items-center justify-between p-4 mb-2">
-          <div className="flex items-center gap-2">
+          <Link to="/landing" className="flex items-center gap-2">
             <Zap className="w-6 h-6 text-[var(--primary)]" />
             <span className="font-bold text-xl bg-gradient-to-r from-[#6A68DF] to-[#EFB995] text-transparent bg-clip-text">
               CampusFlow AI
             </span>
-          </div>
+          </Link>
         </div>
 
         {/* Navigation Items */}

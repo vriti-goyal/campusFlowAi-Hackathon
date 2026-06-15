@@ -23,13 +23,14 @@ import BatchPage from './pages/Batch';
 import ProfilePage from './pages/Profile';
 import PlacementNoticesPage from './pages/PlacementNotices';
 import NoticesPage from './pages/Notices';
+import LandingPage from './pages/Landing';
 
-/** Redirect unauthenticated users to /login.
+/** Redirect unauthenticated users to /landing.
  *  Redirect users with incomplete profiles to /setup. */
 function PrivateRoute({ children }) {
   const { user, dbUser, loading } = useAuth();
   if (loading) return <Spinner />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/landing" replace />;
   // If dbUser is loaded and profile is not complete, redirect to setup
   // Use !dbUser?.profileComplete to handle both false and undefined, but skip if dbUser hasn't loaded yet
   if (dbUser !== null && dbUser.profileComplete === false) return <Navigate to="/setup" replace />;
@@ -40,7 +41,7 @@ function PrivateRoute({ children }) {
 function SetupRoute() {
   const { user, dbUser, loading } = useAuth();
   if (loading) return <Spinner />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/landing" replace />;
   if (dbUser?.profileComplete) return <Navigate to="/dashboard" replace />;
   return <ProfileSetupPage />;
 }
@@ -52,6 +53,7 @@ export default function App() {
         <AuthProvider>
           <ToastContainer />
           <Routes>
+            <Route path="/landing" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/setup" element={<SetupRoute />} />
 
@@ -64,7 +66,7 @@ export default function App() {
                 </PrivateRoute>
               }
             >
-              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route index element={<Navigate to="/landing" replace />} />
               <Route path="dashboard"          element={<DashboardPage />} />
               <Route path="notices"            element={<NoticesPage />} />
               <Route path="assignments"        element={<AssignmentsPage />} />
@@ -79,7 +81,7 @@ export default function App() {
             </Route>
 
             {/* Catch-all */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/landing" replace />} />
           </Routes>
         </AuthProvider>
       </ToastProvider>
