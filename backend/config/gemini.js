@@ -6,8 +6,7 @@ const keys = [
 ].filter(Boolean);
 
 let keyIndex = 0;
-
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_MODEL = "gemini-1.5-flash";
 
 export async function invokeAIVision(buffer, mimeType, maxTokens = 4096) {
   for (let i = 0; i < keys.length; i++) {
