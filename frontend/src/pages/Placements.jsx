@@ -70,14 +70,14 @@ const MOCK_PLACEMENTS = [
   }
 ];
 
-const getMockStats = () => {
+const getStatsFromPlacements = (items = []) => {
   const now = new Date();
   const twoDays = new Date(now.getTime() + 48 * 60 * 60 * 1000);
   return {
-    total: MOCK_PLACEMENTS.length,
-    eligible: MOCK_PLACEMENTS.filter((p) => p.eligibilityStatus === 'eligible').length,
-    applied: MOCK_PLACEMENTS.filter((p) => p.applicationStatus === 'Applied').length,
-    deadlineSoon: MOCK_PLACEMENTS.filter((p) => p.deadline && new Date(p.deadline) >= now && new Date(p.deadline) <= twoDays).length
+    total: items.length,
+    eligible: items.filter((p) => p.eligibilityStatus === 'eligible').length,
+    applied: items.filter((p) => p.applicationStatus === 'Applied').length,
+    deadlineSoon: items.filter((p) => p.applicationStatus !== 'Applied' && p.deadline && new Date(p.deadline) >= now && new Date(p.deadline) <= twoDays).length
   };
 };
 
@@ -97,6 +97,10 @@ export default function PlacementsPage() {
 
   const gmail = useGmail();
   const isUsingMockData = placements.some((p) => p._isMock);
+  const displayStats = useMemo(() => {
+    if (isUsingMockData) return getStatsFromPlacements(placements);
+    return stats;
+  }, [isUsingMockData, placements, stats]);
 
   const fetchData = async () => {
     try {
@@ -116,11 +120,11 @@ export default function PlacementsPage() {
         setPlacements(livePlacements);
       } else {
         setPlacements(MOCK_PLACEMENTS);
-        if (!statsRes.data.data) setStats(getMockStats());
+        if (!statsRes.data.data) setStats(getStatsFromPlacements(MOCK_PLACEMENTS));
       }
     } catch {
       setPlacements(MOCK_PLACEMENTS);
-      setStats(getMockStats());
+      setStats(getStatsFromPlacements(MOCK_PLACEMENTS));
       toast('Showing demo placement data', { icon: 'ℹ️' });
     } finally {
       setLoading(false);
@@ -143,6 +147,14 @@ export default function PlacementsPage() {
   }, []);
 
   const handleSync = async () => {
+    if (isUsingMockData) {
+      const demoSyncResult = { processed: 18, added: 3, skipped: 15 };
+      setSyncResult(demoSyncResult);
+      toast.success(`Found ${demoSyncResult.added} new placements!`);
+      setTimeout(() => setSyncResult(null), 5000);
+      return;
+    }
+
     try {
       const res = await gmail.sync();
       toast.success(`Found ${res.added} new placements!`);
@@ -202,6 +214,11 @@ export default function PlacementsPage() {
   };
 
   const handleRemind = async (placement) => {
+    if (placement?._isMock) {
+      toast.success('Demo reminder added to calendar');
+      return;
+    }
+
     try {
       await api.post('/api/calendar/events', {
         title: `Reminder: Apply for ${placement.company}`,
@@ -214,6 +231,14 @@ export default function PlacementsPage() {
     } catch {
       toast.error('Failed to set reminder');
     }
+  };
+
+  const isEligibleForUser = (placement) => {
+    const minCgpa = Number(placement?.minimumCgpa || 0);
+    if (dbUser?.cgpa != null) {
+      return Number(dbUser.cgpa) >= minCgpa;
+    }
+    return placement?.eligibilityStatus !== 'not_eligible';
   };
 
   const filteredAndSortedPlacements = useMemo(() => {
@@ -241,7 +266,7 @@ export default function PlacementsPage() {
 
     switch (activeTab) {
       case 'Eligible':
-        result = result.filter(p => p.eligibilityStatus === 'eligible' && p.applicationStatus === 'Not Applied');
+        result = result.filter(p => isEligibleForUser(p) && p.applicationStatus === 'Not Applied');
         break;
       case 'Applied':
         result = result.filter(p => p.applicationStatus === 'Applied');
@@ -250,7 +275,7 @@ export default function PlacementsPage() {
         result = result.filter(p => p.applicationStatus !== 'Applied' && p.deadline && new Date(p.deadline) <= fortyEightHoursFromNow && new Date(p.deadline) >= now);
         break;
       case 'Not Eligible':
-        result = result.filter(p => p.eligibilityStatus === 'not_eligible' && p.applicationStatus !== 'Applied');
+        result = result.filter(p => !isEligibleForUser(p) && p.applicationStatus !== 'Applied');
         break;
       case 'Missed':
         result = result.filter(p => p.applicationStatus !== 'Applied' && p.deadline && new Date(p.deadline) < now);
@@ -275,7 +300,7 @@ export default function PlacementsPage() {
     });
 
     return result;
-  }, [placements, activeTab, searchQuery, sortOption, sourceFilter]);
+  }, [placements, activeTab, searchQuery, sortOption, sourceFilter, dbUser?.cgpa]);
 
   if (loading) {
     return (
@@ -351,26 +376,26 @@ export default function PlacementsPage() {
       )}
 
       {/* Stats Row */}
-      {stats && (
+      {displayStats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <CFCard className="flex flex-col gap-2">
             <div className="flex items-center gap-2 text-[var(--text-secondary)] font-medium"><Briefcase size={18} className="text-[#6A68DF]" /> Total</div>
-            <div className="text-2xl font-bold">{stats.total}</div>
+            <div className="text-2xl font-bold">{displayStats.total}</div>
           </CFCard>
           <CFCard className="flex flex-col gap-2">
             <div className="flex items-center gap-2 text-[var(--text-secondary)] font-medium"><CheckCircle2 size={18} className="text-green-500" /> Eligible</div>
-            <div className="text-2xl font-bold">{stats.eligible}</div>
+            <div className="text-2xl font-bold">{displayStats.eligible}</div>
           </CFCard>
           <CFCard className="flex flex-col gap-2">
             <div className="flex items-center gap-2 text-[var(--text-secondary)] font-medium"><CheckCircle2 size={18} className="text-[#EFB995]" /> Applied</div>
-            <div className="text-2xl font-bold">{stats.applied}</div>
+            <div className="text-2xl font-bold">{displayStats.applied}</div>
           </CFCard>
           <CFCard className="flex flex-col gap-2 relative overflow-hidden">
             <div className="flex items-center gap-2 text-[var(--text-secondary)] font-medium">
-              <Clock size={18} className={cn("text-red-500", stats.deadlineSoon > 0 && "animate-pulse")} /> Deadline Soon
+              <Clock size={18} className={cn("text-red-500", displayStats.deadlineSoon > 0 && "animate-pulse")} /> Deadline Soon
             </div>
-            <div className="text-2xl font-bold text-white">{stats.deadlineSoon}</div>
-            {stats.deadlineSoon > 0 && <div className="absolute top-0 right-0 w-2 h-2 rounded-full bg-blue-500 m-4 animate-ping" />}
+            <div className="text-2xl font-bold text-white">{displayStats.deadlineSoon}</div>
+            {displayStats.deadlineSoon > 0 && <div className="absolute top-0 right-0 w-2 h-2 rounded-full bg-blue-500 m-4 animate-ping" />}
           </CFCard>
         </div>
       )}
@@ -470,7 +495,7 @@ export default function PlacementsPage() {
               onRemind={handleRemind}
               applying={applying} 
               userCgpa={dbUser?.cgpa}
-              isNotEligible={p.eligibilityStatus === 'not_eligible'}
+              isNotEligible={!isEligibleForUser(p)}
             />
           ))}
         </div>
