@@ -108,24 +108,25 @@ router.post('/upload', verifyFirebaseToken, fileUpload.single('file'), async (re
         }
       }
     } else {
-      // ── PDF/Image path: S3 → Textract → AI ──
+      // ── PDF/Image path: AI extraction ──
       console.log('[ExamSchedule] PDF/image upload detected, running AI extraction...');
 
-      let extractedText;
+      let extractedText = '';
       try {
         extractedText = await extractTextFromBuffer(req.file.buffer, req.file.mimetype);
       } catch (extractErr) {
-        console.error('[ExamSchedule] Text extraction error:', extractErr.message);
-        return fail(res, `Text extraction failed: ${extractErr.message}`, 400);
+        console.error('[ExamSchedule] AI extraction failed:', extractErr.message);
+        // Give a clean, actionable error — not the raw AI error
+        return fail(res, '⚠️ AI extraction is currently unavailable (API quota exceeded). Please use CSV format instead.\n\nCSV columns needed: course_code, course_name, exam_date, exam_time, venue', 400);
       }
 
       if (!extractedText || !extractedText.trim()) {
-        return fail(res, 'The AI could not find any readable text in this file. Please try a higher quality scan or use CSV format instead.', 400);
+        return fail(res, '⚠️ AI could not read text from this file. Please use CSV format instead.\n\nCSV columns needed: course_code, course_name, exam_date, exam_time, venue', 400);
       }
 
       rows = await extractExamScheduleFromText(extractedText);
       if (!rows || rows.length === 0) {
-        return fail(res, 'AI could not detect any exam schedule entries in the document. Try a clearer PDF or use CSV format.', 400);
+        return fail(res, 'AI could not detect exam schedule entries in this document. Try a clearer PDF or switch to CSV format.', 400);
       }
 
       console.log(`[ExamSchedule] AI extracted ${rows.length} exam entries from PDF`);

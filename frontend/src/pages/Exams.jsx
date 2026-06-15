@@ -47,7 +47,12 @@ function CSVUploadPanel({ batches, onUploaded, onClose }) {
       setFile(null);
       onUploaded();
     } catch (err) {
-      setMsg({ type: 'error', text: err.response?.data?.error || 'Upload failed.' });
+      const rawMsg = err.response?.data?.error || 'Upload failed.';
+      // Strip the raw AI error dump and show a clean message
+      const cleanMsg = rawMsg.includes('AI text extraction failed') || rawMsg.includes('quota')
+        ? '⚠️ AI quota exhausted. Please upload a CSV file instead.'
+        : rawMsg;
+      setMsg({ type: 'error', text: cleanMsg });
     } finally {
       setUploading(false);
     }
@@ -63,14 +68,18 @@ function CSVUploadPanel({ batches, onUploaded, onClose }) {
         <CFButton variant="ghost" size="sm" onClick={onClose} icon={X} className="px-2 py-2" />
       </div>
 
-      <p className="text-sm text-[var(--text-secondary)]">
-        Upload a <strong>PDF/Image</strong> and AI will extract the schedule, or use a <strong>CSV</strong> with columns:{' '}
-        <code className="bg-[var(--bg)] px-1.5 py-0.5 rounded text-[11px] font-mono border border-[var(--border)]">course_code</code>,{' '}
-        <code className="bg-[var(--bg)] px-1.5 py-0.5 rounded text-[11px] font-mono border border-[var(--border)]">course_name</code>,{' '}
-        <code className="bg-[var(--bg)] px-1.5 py-0.5 rounded text-[11px] font-mono border border-[var(--border)]">exam_date</code>,{' '}
-        <code className="bg-[var(--bg)] px-1.5 py-0.5 rounded text-[11px] font-mono border border-[var(--border)]">exam_time</code>,{' '}
-        <code className="bg-[var(--bg)] px-1.5 py-0.5 rounded text-[11px] font-mono border border-[var(--border)]">venue</code>
-      </p>
+      <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-xl text-amber-700 dark:text-amber-400 text-xs">
+        <span className="text-base leading-none">💡</span>
+        <div>
+          <strong>Recommended: Use CSV</strong> — AI PDF extraction requires an active API quota.
+          CSV works instantly without AI. Columns needed:{' '}
+          <code className="bg-[var(--bg)] px-1 py-0.5 rounded text-[11px] font-mono border border-[var(--border)]">course_code</code>,{' '}
+          <code className="bg-[var(--bg)] px-1 py-0.5 rounded text-[11px] font-mono border border-[var(--border)]">course_name</code>,{' '}
+          <code className="bg-[var(--bg)] px-1 py-0.5 rounded text-[11px] font-mono border border-[var(--border)]">exam_date</code>,{' '}
+          <code className="bg-[var(--bg)] px-1 py-0.5 rounded text-[11px] font-mono border border-[var(--border)]">exam_time</code>,{' '}
+          <code className="bg-[var(--bg)] px-1 py-0.5 rounded text-[11px] font-mono border border-[var(--border)]">venue</code>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
         <div>
