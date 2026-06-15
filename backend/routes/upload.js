@@ -49,7 +49,7 @@ router.post('/file', verifyFirebaseToken, upload.single('file'), async (req, res
     // Upload to S3
     const fileUrl = await uploadToS3(req.file.buffer, req.file.originalname, req.file.mimetype);
 
-    // Extract text via Gemini Vision for document classification
+    // Extract text via local parsers/OCR (with Groq vision fallback for images)
     let extractedText = '';
     try {
       extractedText = await extractTextFromBuffer(req.file.buffer, req.file.mimetype);

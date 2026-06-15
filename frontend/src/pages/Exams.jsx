@@ -155,6 +155,13 @@ export default function ExamsPage() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  const getBatchName = useCallback((batchRef) => {
+    if (!batchRef) return '';
+    if (typeof batchRef === 'object' && batchRef.batchName) return batchRef.batchName;
+    const id = typeof batchRef === 'object' ? batchRef._id : batchRef;
+    return batches.find(b => b._id === id)?.batchName || '';
+  }, [batches]);
+
   const allExams = [
     ...scheduleExams.map(e => ({
       _id: e._id,
@@ -165,6 +172,7 @@ export default function ExamsPage() {
       source: 'schedule',
       courseCode: e.courseCode,
       batchId: e.batchId,
+      batchName: getBatchName(e.batchId) || e.batchName || '',
     })),
     ...legacyExams.map(e => ({
       _id: e._id,
@@ -174,6 +182,7 @@ export default function ExamsPage() {
       venue: e.venue,
       source: 'legacy',
       batchId: e.batchId,
+      batchName: getBatchName(e.batchId) || e.batchName || '',
     })),
   ].sort((a, b) => new Date(a.date) - new Date(b.date));
 
@@ -297,9 +306,9 @@ export default function ExamsPage() {
                       <h3 className={cn("font-semibold text-lg leading-snug", isToday ? "text-white" : "text-[var(--text-primary)]")}>
                         {exam.subject}
                       </h3>
-                      {exam.batchId?.batchName && (
+                      {(exam.batchName || exam.batchId?.batchName) && (
                         <CFBadge variant="outline" className={cn("mt-1 text-[10px] px-1.5 py-0", isToday ? "border-white/40 text-white/90" : "bg-[var(--background)]")}>
-                          {exam.batchId.batchName}
+                          {exam.batchName || exam.batchId?.batchName}
                         </CFBadge>
                       )}
                     </div>

@@ -137,6 +137,7 @@ export default function AssignmentsPage() {
   const [updating, setUpdating] = useState(null);
   const [activeTab, setActiveTab] = useState('Not Started');
   const [batches, setBatches] = useState([]);
+  const [showUpload, setShowUpload] = useState(false);
 
   const fetchAssignments = async () => {
     try {
@@ -203,15 +204,15 @@ export default function AssignmentsPage() {
     );
   }
 
-  if (!assignments.length) {
-    return (
-      <CFEmptyState 
-        icon={ClipboardList}
-        title="No Assignments Yet"
-        description="Upload a notice to automatically create assignments."
-      />
-    );
-  }
+  // if (!assignments.length) {
+  //   return (
+  //     <CFEmptyState 
+  //       icon={ClipboardList}
+  //       title="No Assignments Yet"
+  //       description="Upload a notice to automatically create assignments."
+  //     />
+  //   );
+  // }
 
   return (
     <div className="space-y-6 max-w-6xl pb-10">
@@ -222,19 +223,31 @@ export default function AssignmentsPage() {
           </h1>
           <p className="text-[var(--text-secondary)] text-sm mt-1">Track and manage your assignments</p>
         </div>
+        <div className="flex gap-2">
+          <CFButton
+            variant={showUpload ? 'primary' : 'secondary'}
+            size="sm"
+            onClick={() => setShowUpload((s) => !s)}
+            icon={Upload}
+          >
+            {showUpload ? 'Hide Upload' : 'Upload Assignment'}
+          </CFButton>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Upload Panel */}
-        <div className="lg:col-span-1">
+      {showUpload && (
+        <div className="max-w-2xl">
           <UploadPanel
             batches={batches}
-            onUploaded={fetchAssignments}
+            onUploaded={() => {
+              fetchAssignments();
+              setShowUpload(false);
+            }}
           />
         </div>
+      )}
 
-        {/* Right: Content */}
-        <div className="lg:col-span-2 space-y-4">
+      <div className="space-y-4">
 
       {/* Status Tabs */}
       <div className="flex overflow-x-auto pb-2 gap-2 hide-scrollbar">
@@ -273,7 +286,7 @@ export default function AssignmentsPage() {
             else if (a.priorityLevel === 'low') priorityVariant = "low";
 
             return (
-              <CFCard key={a._id} className={cn("flex flex-col h-full", isOverdue && "border-l-4 border-l-red-500")}>
+              <CFCard key={a._id} className={cn("flex flex-col h-full", isOverdue && "border-l-4 border-l-yellow-500")}>
                 <div className="flex items-start justify-between mb-3 gap-2">
                   <div className="flex flex-wrap gap-2">
                     {a.batchId?.batchName && (
@@ -337,7 +350,6 @@ export default function AssignmentsPage() {
           })}
         </div>
       )}
-        </div>
       </div>
     </div>
   );

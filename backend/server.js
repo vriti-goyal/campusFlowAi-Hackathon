@@ -27,13 +27,25 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // ── Middleware ──────────────────────────────────────────────
-app.use(cors({
-  origin: function (origin, callback) {
-    // dynamically allow any origin for local testing, fallback to FRONTEND_URL in prod
-    callback(null, origin || process.env.FRONTEND_URL || '*');
+const allowedOrigins = new Set([
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+]);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.has(origin)) return callback(null, true);
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
   },
-  credentials: true
-}));
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(morgan('dev'));
 app.use(express.json());
 

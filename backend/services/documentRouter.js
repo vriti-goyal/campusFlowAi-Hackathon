@@ -9,6 +9,18 @@ import { BatchMember } from '../models/BatchMember.js';
 import { User } from '../models/User.js';
 import { calculatePriorityScore } from './priorityScore.js';
 
+function normalizeSubmissionMode(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return 'online';
+  if (normalized === 'online' || normalized === 'offline' || normalized === 'both') return normalized;
+
+  if (normalized.includes('both')) return 'both';
+  if (normalized.includes('offline') || normalized.includes('physical') || normalized.includes('in person')) return 'offline';
+  if (normalized.includes('online') || normalized.includes('portal') || normalized.includes('email') || normalized.includes('lms')) return 'online';
+
+  return 'online';
+}
+
 /**
  * Main document routing pipeline.
  * Called from upload.js for both file and text uploads.
@@ -100,7 +112,7 @@ async function handleAssignment({ text, userId, batchId, fileUrl, targetType, ta
     title: extracted.title,
     subject: extracted.subject || '',
     deadline: extracted.deadline ? new Date(extracted.deadline) : null,
-    submissionMode: extracted.submission_mode || '',
+    submissionMode: normalizeSubmissionMode(extracted.submission_mode),
     priorityScore,
     priorityLevel,
     status: 'Not Started',
@@ -135,7 +147,7 @@ async function handleAssignment({ text, userId, batchId, fileUrl, targetType, ta
           title: extracted.title,
           subject: extracted.subject,
           deadline: extracted.deadline,
-          submissionMode: extracted.submission_mode,
+          submissionMode: normalizeSubmissionMode(extracted.submission_mode),
           actionRequired: extracted.action_required,
           priorityLevel,
         }

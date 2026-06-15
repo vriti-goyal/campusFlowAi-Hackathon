@@ -208,7 +208,7 @@ Return ONLY valid JSON. No markdown, no explanation.
   "subject": "Subject/Course name",
   "course_code": "CS301",
   "deadline": "2024-06-20T17:00:00.000Z",
-  "submission_mode": "ERP Portal / Email / Physical",
+  "submission_mode": "online | offline | both",
   "description": "Brief description of what needs to be submitted",
   "action_required": "What the student must do"
 }
@@ -216,15 +216,17 @@ Return ONLY valid JSON. No markdown, no explanation.
 Rules:
 - "deadline" must be ISO 8601 format. If only date given, assume 11:59 PM.
 - If deadline is not mentioned, set to null
-- "submission_mode" can be empty string if not mentioned
+- "submission_mode" must be exactly one of: online, offline, both. Default to online if unclear.
 - Be specific and actionable in "action_required"`;
 
   try {
     const response = await invokeAI(prompt, 512);
-    return parseJSONObject(response);
+    const parsed = parseJSONObject(response);
+    if (parsed && parsed.title) return parsed;
+    return assignmentFallbackFromText(text);
   } catch (err) {
     console.error('[Extractor] Assignment extraction failed:', err.message);
-    return null;
+    return assignmentFallbackFromText(text);
   }
 }
 
@@ -278,6 +280,108 @@ function stripFences(raw) {
     .trim();
 }
 
+function extractFirstJsonObject(raw) {
+  if (!raw) return null;
+  const start = raw.indexOf('{');
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < raw.length; i++) {
+    const ch = raw[i];
+
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === '{') depth++;
+    if (ch === '}') {
+      depth--;
+      if (depth === 0) return raw.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+function extractFirstJsonArray(raw) {
+  if (!raw) return null;
+  const start = raw.indexOf('[');
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < raw.length; i++) {
+    const ch = raw[i];
+
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === '[') depth++;
+    if (ch === ']') {
+      depth--;
+      if (depth === 0) return raw.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+function parseDateFromText(text) {
+  if (!text) return null;
+
+  const numeric = text.match(/\b(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})\b/);
+  if (numeric) {
+    const d = new Date(numeric[1]);
+    if (!isNaN(d.getTime())) return d.toISOString();
+  }
+
+  const longMonth = text.match(/\b(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})\b/);
+  if (longMonth) {
+    const d = new Date(longMonth[1]);
+    if (!isNaN(d.getTime())) return d.toISOString();
+  }
+
+  return null;
+}
+
+function assignmentFallbackFromText(text) {
+  const firstLine = text.split('\n').find(l => l.trim())?.trim() || 'Assignment Notice';
+  const subjectMatch = text.match(/subject\s*[:\-]\s*(.+)/i);
+  const modeMatch = text.match(/(submission mode|submit via|upload on)\s*[:\-]\s*(.+)/i);
+  const deadlineLine =
+    text.match(/deadline\s*[:\-]\s*(.+)/i)?.[1] ||
+    text.match(/due date\s*[:\-]\s*(.+)/i)?.[1] ||
+    '';
+
+  return {
+    title: firstLine.length > 120 ? `${firstLine.slice(0, 117)}...` : firstLine,
+    subject: (subjectMatch?.[1] || '').trim(),
+    course_code: '',
+    deadline: parseDateFromText(deadlineLine || text),
+    submission_mode: (modeMatch?.[2] || '').trim(),
+    description: text.slice(0, 280).trim(),
+    action_required: 'Complete and submit before the deadline.',
+  };
+}
+
 function parseJSONArray(raw) {
   try {
     const cleaned = stripFences(raw);
@@ -285,9 +389,9 @@ function parseJSONArray(raw) {
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     // Try to extract array from mixed text
-    const match = raw.match(/\[[\s\S]*\]/);
-    if (match) {
-      try { return JSON.parse(match[0]); } catch { return []; }
+    const candidate = extractFirstJsonArray(raw);
+    if (candidate) {
+      try { return JSON.parse(candidate); } catch { return []; }
     }
     return [];
   }
@@ -299,9 +403,9 @@ function parseJSONObject(raw) {
     const parsed = JSON.parse(cleaned);
     return typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
   } catch {
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (match) {
-      try { return JSON.parse(match[0]); } catch { return null; }
+    const candidate = extractFirstJsonObject(raw);
+    if (candidate) {
+      try { return JSON.parse(candidate); } catch { return null; }
     }
     return null;
   }

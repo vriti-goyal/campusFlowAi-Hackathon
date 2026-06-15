@@ -206,7 +206,12 @@ export default function NoticesPage() {
     try {
       const url = `/api/posts/${selectedBatch._id}${category !== 'all' ? `?category=${category}` : ''}`;
       const res = await api.get(url);
-      setPosts(res.data || []);
+      const allowedNoticeTypes = new Set(CATEGORIES);
+      const filtered = (res.data || []).filter((post) => {
+        const postType = String(post?.type || '').toLowerCase();
+        return allowedNoticeTypes.has(postType);
+      });
+      setPosts(filtered);
     } catch { }
   };
 

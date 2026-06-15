@@ -79,22 +79,63 @@ function parseLLMResponse(raw, fallbackText) {
   try {
     return JSON.parse(cleaned);
   } catch (e) {
+    const objectCandidate = extractFirstJsonObject(cleaned);
+    if (objectCandidate) {
+      try {
+        return JSON.parse(objectCandidate);
+      } catch {
+        // continue to regex fallback below
+      }
+    }
     console.warn('[AI Pipeline] JSON parse failed, attempting regex fallback:', e.message);
     return regexFallbackExtraction(fallbackText || raw);
   }
 }
 
+function extractFirstJsonObject(raw) {
+  const start = raw.indexOf('{');
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < raw.length; i++) {
+    const ch = raw[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === '{') depth++;
+    if (ch === '}') {
+      depth--;
+      if (depth === 0) return raw.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
 /**
- * Basic regex fallback if Bedrock returns unparseable output.
+ * Basic regex fallback if model output is unparseable.
  * Extracts dates and keywords to build a minimal extraction.
  */
 function regexFallbackExtraction(text) {
   // Try to find dates in common formats
   const dateMatch = text.match(/(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/);
   const isoDateMatch = text.match(/(\d{4}-\d{2}-\d{2})/);
+  const longMonthDateMatch = text.match(/(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})/);
   let deadline = null;
   if (isoDateMatch) {
     deadline = new Date(isoDateMatch[1]).toISOString();
+  } else if (longMonthDateMatch) {
+    const parsed = new Date(longMonthDateMatch[1]);
+    if (!isNaN(parsed)) deadline = parsed.toISOString();
   } else if (dateMatch) {
     const parsed = new Date(dateMatch[1]);
     if (!isNaN(parsed)) deadline = parsed.toISOString();
@@ -166,9 +207,9 @@ async function checkDuplicate(batchId, uploadedBy, category, title) {
 
 /**
  * Process an upload through the real AI pipeline:
- * 1. Extract text (Textract for files, raw text for text input)
- * 2. Call Bedrock for notice extraction
- * 3. If placement, call Bedrock again for structured placement fields
+ * 1. Extract text (file OCR/parser or raw text input)
+ * 2. Call AI model for notice extraction
+ * 3. If placement, call AI model again for structured placement fields
  * 4. Calculate priority score
  * 5. Check for duplicates
  *
@@ -185,8 +226,8 @@ export async function processUpload(fileUrl, batchId, uploadedBy, rawText = null
     extractedText = `Document uploaded: ${fileUrl || 'unknown file'}. Please classify this as a general academic notice.`;
   }
 
-  // Step 2: Notice extraction via Bedrock
-  console.log('[AI Pipeline] Calling Bedrock for notice extraction...');
+  // Step 2: Notice extraction via AI model
+  console.log('[AI Pipeline] Calling AI model for notice extraction...');
   let extraction;
   try {
     const noticePrompt = buildNoticeExtractionPrompt(extractedText);
@@ -194,7 +235,7 @@ export async function processUpload(fileUrl, batchId, uploadedBy, rawText = null
     extraction = parseLLMResponse(noticeResponse, extractedText);
     console.log('[AI Pipeline] Notice extraction result:', JSON.stringify(extraction));
   } catch (err) {
-    console.error('[AI Pipeline] Bedrock notice extraction failed:', err.message);
+    console.error('[AI Pipeline] Notice extraction failed:', err.message);
     // Fallback to regex
     extraction = regexFallbackExtraction(extractedText);
     console.log('[AI Pipeline] Using regex fallback:', JSON.stringify(extraction));
@@ -202,7 +243,7 @@ export async function processUpload(fileUrl, batchId, uploadedBy, rawText = null
 
   // Step 3: If placement, get structured placement fields
   if (extraction.category === 'placement') {
-    console.log('[AI Pipeline] Calling Bedrock for placement-specific extraction...');
+    console.log('[AI Pipeline] Calling AI model for placement-specific extraction...');
     try {
       const placementPrompt = buildPlacementExtractionPrompt(extractedText);
       const placementResponse = await invokeAI(placementPrompt, 1024);
@@ -222,7 +263,7 @@ export async function processUpload(fileUrl, batchId, uploadedBy, rawText = null
       });
       console.log('[AI Pipeline] Placement fields merged');
     } catch (err) {
-      console.error('[AI Pipeline] Bedrock placement extraction failed:', err.message);
+      console.error('[AI Pipeline] Placement extraction failed:', err.message);
       // Continue with basic extraction — no placement-specific fields
       extraction.company = extraction.title || 'Unknown';
       extraction.role = '';

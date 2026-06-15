@@ -1,78 +1,71 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+const GROQ_KEY = process.env.GROQ_API_KEY;
 
-const keys = [
-  process.env.GEMINI_API_KEY,
-  process.env.GEMINI_API_KEY_2,
-  process.env.GEMINI_API_KEY_3,
-  process.env.GEMINI_API_KEY_4,
-  process.env.GEMINI_API_KEY_5,
-].filter(Boolean);
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+const GROQ_VISION_MODEL = process.env.GROQ_VISION_MODEL || GROQ_MODEL;
 
-let keyIndex = 0;
-const GEMINI_MODEL = "gemini-2.0-flash";
+function isRateLimit(status, body) {
+  const msg = typeof body === 'string' ? body : JSON.stringify(body || {});
+  return status === 429 || /rate|quota|limit/i.test(msg);
+}
 
-export async function invokeAIVision(buffer, mimeType, maxTokens = 4096) {
-  for (let i = 0; i < keys.length; i++) {
-    const key = keys[(keyIndex + i) % keys.length];
-    try {
-      const genAI = new GoogleGenerativeAI(key);
-      const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
-      const prompt = "Extract all text from this document accurately. Do not add any extra commentary, just return the exact text content found in the document.";
-      const result = await model.generateContent({
-        contents: [{
-          role: "user",
-          parts: [
-            { inlineData: { data: buffer.toString("base64"), mimeType } },
-            { text: prompt }
-          ]
-        }],
-        generationConfig: { maxOutputTokens: maxTokens, temperature: 0.1 }
-      });
-      keyIndex = (keyIndex + i + 1) % keys.length;
-      return result.response.text();
-    } catch (err) {
-      const isRateLimit = err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED') || err.status === 429;
-      if (isRateLimit && i < keys.length - 1) {
-        console.warn(`[Gemini Vision] Key #${(keyIndex + i) % keys.length + 1} rate-limited, waiting 2s before trying next key...`);
-        await new Promise(r => setTimeout(r, 2000));
-        continue;
-      }
-      if (isRateLimit) {
-        throw new Error("Rate limit exceeded across all keys. Please try again in a moment.");
-      }
-      throw err;
-    }
+async function callGroq(messages, { maxTokens, temperature, model }) {
+  if (!GROQ_KEY) {
+    throw new Error('Missing GROQ_API_KEY. Add GROQ_API_KEY in backend .env and restart server.');
   }
+  const response = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${GROQ_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature,
+      max_tokens: maxTokens,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const errMsg = data?.error?.message || `Groq API failed with status ${response.status}`;
+    if (isRateLimit(response.status, data)) {
+      throw new Error(`Groq rate limit/quota hit: ${errMsg}`);
+    }
+    throw new Error(errMsg);
+  }
+
+  const text = data?.choices?.[0]?.message?.content;
+  if (!text || typeof text !== 'string') {
+    throw new Error('Groq returned empty completion content.');
+  }
+  return text;
 }
 
 export async function invokeAI(prompt, maxTokens = 512) {
-  for (let i = 0; i < keys.length; i++) {
-    const key = keys[(keyIndex + i) % keys.length];
-    try {
-      const genAI = new GoogleGenerativeAI(key);
-      const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
-      
-      const result = await model.generateContent({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          maxOutputTokens: maxTokens,
-          temperature: 0.2,
-          topP: 0.9,
-        }
-      });
-      keyIndex = (keyIndex + i + 1) % keys.length;
-      return result.response.text();
-    } catch (err) {
-      const isRateLimit = err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED') || err.status === 429;
-      if (isRateLimit && i < keys.length - 1) {
-        console.warn(`[Gemini] Key #${(keyIndex + i) % keys.length + 1} rate-limited, waiting 2s before trying next key...`);
-        await new Promise(r => setTimeout(r, 2000));
-        continue;
-      }
-      if (isRateLimit) {
-        return "I'm a little busy right now. Please try again in a moment.";
-      }
-      throw err;
-    }
+  return callGroq(
+    [{ role: 'user', content: prompt }],
+    { maxTokens, temperature: 0.2, model: GROQ_MODEL }
+  );
+}
+
+export async function invokeAIVision(buffer, mimeType, maxTokens = 4096) {
+  if (!mimeType?.startsWith('image/')) {
+    throw new Error(`Groq vision supports image input only, got: ${mimeType}`);
   }
+
+  const base64 = buffer.toString('base64');
+  const prompt = 'Extract all visible text from this image. Return only extracted text.';
+
+  return callGroq(
+    [{
+      role: 'user',
+      content: [
+        { type: 'text', text: prompt },
+        { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
+      ],
+    }],
+    { maxTokens, temperature: 0, model: GROQ_VISION_MODEL }
+  );
 }

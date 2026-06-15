@@ -8,16 +8,17 @@ import { cn } from '@/lib/utils';
 const CATEGORIES = ['Assignment', 'Exam', 'Placement', 'Event', 'Hostel', 'Transport', 'Personal'];
 
 const getCategoryVariant = (cat) => {
+  const normalized = String(cat || '').toLowerCase();
   const map = {
-    'Assignment': 'default',
-    'Exam': 'high',
-    'Placement': 'success',
-    'Event': 'warning',
-    'Hostel': 'medium',
-    'Transport': 'default',
-    'Personal': 'default'
+    assignment: 'default',
+    exam: 'high',
+    placement: 'success',
+    event: 'warning',
+    hostel: 'medium',
+    transport: 'default',
+    personal: 'default'
   };
-  return map[cat] || 'default';
+  return map[normalized] || 'default';
 };
 
 export default function CalendarPage() {
@@ -89,7 +90,8 @@ export default function CalendarPage() {
 
   // Group events by date string (YYYY-MM-DD)
   const groupedEvents = events.reduce((acc, event) => {
-    const eventDateStr = event.date.split('T')[0]; 
+    if (!event?.date) return acc;
+    const eventDateStr = String(event.date).split('T')[0];
     if (!acc[eventDateStr]) acc[eventDateStr] = [];
     acc[eventDateStr].push(event);
     return acc;
@@ -303,7 +305,7 @@ export default function CalendarPage() {
               
               return (
                 <div key={date} className="relative">
-                  <div className="sticky top-16 z-10 bg-[var(--bg)]/95 backdrop-blur-md py-3 border-b border-[var(--border)] mb-4">
+                  <div className="py-3 border-b border-[var(--border)] mb-4">
                     <h3 className={cn("font-bold text-lg flex items-center gap-3", isToday ? "text-[#6A68DF]" : "text-[var(--text-primary)]")}>
                       {dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
                       {isToday && (
@@ -340,14 +342,16 @@ export default function CalendarPage() {
                           )}
                         </div>
                         
-                        <CFButton 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleDelete(event._id)}
-                          className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all px-2"
-                        >
-                          <Trash2 size={16} />
-                        </CFButton>
+                        {!event.readOnly && (
+                          <CFButton 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleDelete(event._id)}
+                            className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all px-2"
+                          >
+                            <Trash2 size={16} />
+                          </CFButton>
+                        )}
                       </CFCard>
                     ))}
                   </div>
