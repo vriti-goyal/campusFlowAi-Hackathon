@@ -111,11 +111,16 @@ router.post('/upload', verifyFirebaseToken, fileUpload.single('file'), async (re
       // ── PDF/Image path: S3 → Textract → AI ──
       console.log('[ExamSchedule] PDF/image upload detected, running AI extraction...');
 
-      const fileUrl = await uploadToS3(req.file.buffer, req.file.originalname, req.file.mimetype);
-      const extractedText = await extractTextFromBuffer(req.file.buffer, req.file.mimetype);
+      let extractedText;
+      try {
+        extractedText = await extractTextFromBuffer(req.file.buffer, req.file.mimetype);
+      } catch (extractErr) {
+        console.error('[ExamSchedule] Text extraction error:', extractErr.message);
+        return fail(res, `Text extraction failed: ${extractErr.message}`, 400);
+      }
 
       if (!extractedText || !extractedText.trim()) {
-        return fail(res, 'Could not extract text from the uploaded file. Try a clearer image/PDF.', 400);
+        return fail(res, 'The AI could not find any readable text in this file. Please try a higher quality scan or use CSV format instead.', 400);
       }
 
       rows = await extractExamScheduleFromText(extractedText);
