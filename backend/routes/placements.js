@@ -3,6 +3,7 @@ import { verifyFirebaseToken } from '../middleware/auth.js';
 import { Placement } from '../models/Placement.js';
 import { StudentPlacementStatus } from '../models/StudentPlacementStatus.js';
 import { CalendarEvent } from '../models/CalendarEvent.js';
+import { BatchMember } from '../models/BatchMember.js';
 import { calculatePriorityScore } from '../services/priorityScore.js';
 import { ok, fail } from '../utils/response.js';
 
@@ -111,7 +112,16 @@ router.get('/', verifyFirebaseToken, async (req, res) => {
   try {
     const { batchId } = req.query;
     const filter = {};
-    if (batchId) filter.batchId = batchId;
+    if (batchId) {
+      filter.batchId = batchId;
+    } else {
+      const memberships = await BatchMember.find({ userId: req.user._id }).lean();
+      const userBatches = memberships.map(m => m.batchId);
+      filter.$or = [
+        { batchId: null },
+        { batchId: { $in: userBatches } }
+      ];
+    }
 
     const placements = await Placement.find(filter).sort({ deadline: 1 });
 

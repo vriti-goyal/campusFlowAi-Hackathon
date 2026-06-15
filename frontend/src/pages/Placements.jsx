@@ -34,20 +34,8 @@ export default function PlacementsPage() {
       if (statsRes.data.data) setStats(statsRes.data.data);
 
       const batches = batchRes.data || [];
-      if (batches.length === 0) {
-        const res = await api.get('/api/placements');
-        setPlacements(res.data.data || []);
-      } else {
-        const allPlacements = [];
-        const seenIds = new Set();
-        for (const b of batches) {
-          const res = await api.get('/api/placements', { params: { batchId: b._id } });
-          for (const p of (res.data.data || [])) {
-            if (!seenIds.has(p._id)) { seenIds.add(p._id); allPlacements.push(p); }
-          }
-        }
-        setPlacements(allPlacements);
-      }
+      const res = await api.get('/api/placements');
+      setPlacements(res.data.data || []);
     } catch {
       toast.error('Failed to load placements');
     } finally {
