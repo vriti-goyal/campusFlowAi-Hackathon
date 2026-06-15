@@ -50,7 +50,7 @@ function UploadPanel({ batches, onUploaded }) {
         <div className="w-8 h-8 rounded-full bg-[#6A68DF]/10 flex items-center justify-center">
           <Upload size={16} className="text-[#6A68DF]" />
         </div>
-        <h3 className="font-bold text-[var(--text-primary)]">Upload Assignment</h3>
+        <h3 className="font-bold text-[var(--text-primary)]">Upload assignment</h3>
       </div>
 
         <div className="mb-4">
