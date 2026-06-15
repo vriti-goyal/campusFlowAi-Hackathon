@@ -164,9 +164,9 @@ function NoticeCard({ notice }) {
           )}
           {deadline && (
             <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border
-              ${daysLeft <= 1 ? 'text-red-400 bg-red-500/10 border-red-500/20' :
-                daysLeft <= 3 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
-                'text-white/50 bg-white/5 border-white/10'}`}>
+              ${daysLeft <= 1 ? 'text-red-600 bg-red-500/10 border-red-500/20 dark:text-red-400' :
+                daysLeft <= 3 ? 'text-amber-600 bg-amber-500/10 border-amber-500/20 dark:text-amber-400' :
+                'text-black/50 bg-black/5 border-black/10 dark:text-white/50 dark:bg-white/5 dark:border-white/10'}`}>
               <Calendar size={10}/> {daysLeft <= 0 ? 'Deadline passed' : `${daysLeft}d left`}
             </span>
           )}
