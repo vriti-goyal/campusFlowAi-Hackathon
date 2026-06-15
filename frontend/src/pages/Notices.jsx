@@ -9,7 +9,7 @@ import { CFButton, CFCard, CFBadge, CFSkeleton, CFEmptyState } from '@/component
 import { cn } from '@/lib/utils';
 
 // ── Upload Panel ────────────────────────────────────────────────────────────
-function UploadPanel({ batches, onUploaded }) {
+function UploadPanel({ batches, onUploaded, onClose }) {
   const fileInputRef = useRef(null);
   const [mode, setMode] = useState('file');
   const [file, setFile] = useState(null);
@@ -55,11 +55,16 @@ function UploadPanel({ batches, onUploaded }) {
 
   return (
     <CFCard className="p-5 space-y-4 border-[#6A68DF]/20">
-      <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-full bg-[#6A68DF]/10 flex items-center justify-center">
-          <Upload size={16} className="text-[#6A68DF]" />
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-[#6A68DF]/10 flex items-center justify-center">
+            <Upload size={16} className="text-[#6A68DF]" />
+          </div>
+          <h3 className="font-bold text-[var(--text-primary)]">Upload Notice</h3>
         </div>
-        <h3 className="font-bold text-[var(--text-primary)]">Upload Notice</h3>
+        {onClose && (
+          <CFButton variant="ghost" size="sm" onClick={onClose} icon={X} className="px-2 py-2" />
+        )}
       </div>
 
       {/* Batch selector */}
@@ -185,6 +190,7 @@ export default function NoticesPage() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState('all');
+  const [showUpload, setShowUpload] = useState(false);
   const [expandedPosts, setExpandedPosts] = useState({});
   const [editingPost, setEditingPost] = useState(null);
   const [editForm, setEditForm] = useState({ title: '', summary: '', originalText: '', type: 'general' });
@@ -269,28 +275,31 @@ export default function NoticesPage() {
           </h1>
           <p className="text-[var(--text-secondary)] text-sm mt-1">All important notices from your batches</p>
         </div>
-        {batches.length > 1 && (
-          <select
-            className="bg-[var(--card)] border border-[var(--border)] rounded-2xl px-4 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#6A68DF]/30"
-            value={selectedBatch?._id || ''}
-            onChange={e => setSelectedBatch(batches.find(b => b._id === e.target.value))}
+        <div className="flex items-center gap-2">
+          {batches.length > 1 && (
+            <select
+              className="bg-[var(--card)] border border-[var(--border)] rounded-2xl px-4 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#6A68DF]/30"
+              value={selectedBatch?._id || ''}
+              onChange={e => setSelectedBatch(batches.find(b => b._id === e.target.value))}
+            >
+              {batches.map(b => <option key={b._id} value={b._id}>{b.batchName}</option>)}
+            </select>
+          )}
+          <CFButton
+            variant={showUpload ? 'primary' : 'secondary'}
+            size="sm"
+            onClick={() => setShowUpload((s) => !s)}
+            icon={Upload}
           >
-            {batches.map(b => <option key={b._id} value={b._id}>{b.batchName}</option>)}
-          </select>
-        )}
+            {showUpload ? 'Hide Upload' : 'Upload Notice'}
+          </CFButton>
+        </div>
       </div>
 
       {batches.length === 0 ? (
         <CFEmptyState icon={Bell} title="No Batches Yet" description="Join or create a batch to see notices." />
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: Upload Panel */}
-          <div className="lg:col-span-1">
-            <UploadPanel batches={batches} onUploaded={fetchPosts} />
-          </div>
-
-          {/* Right: Feed */}
-          <div className="lg:col-span-2 space-y-4">
+        <div className="space-y-4">
             {/* Posts */}
             {posts.length === 0 ? (
               <CFEmptyState title="No notices" description="No notices in this category yet." />
@@ -419,6 +428,23 @@ export default function NoticesPage() {
                 );
               })
             )}
+        </div>
+      )}
+
+      {showUpload && (
+        <div
+          className="fixed inset-0 z-50 bg-black/45 backdrop-blur-[1px] p-4 flex items-center justify-center"
+          onClick={() => setShowUpload(false)}
+        >
+          <div className="w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
+            <UploadPanel
+              batches={batches}
+              onUploaded={() => {
+                fetchPosts();
+                setShowUpload(false);
+              }}
+              onClose={() => setShowUpload(false)}
+            />
           </div>
         </div>
       )}

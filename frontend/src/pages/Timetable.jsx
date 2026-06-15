@@ -156,7 +156,8 @@ export default function TimetablePage() {
     setLoading(true);
     try {
       const endpoint = selectedBatch === 'all' ? '/api/timetable/my-timetable' : `/api/timetable/batch/${selectedBatch}`;
-      const res = await api.get(endpoint);
+      const config = selectedBatch === 'all' ? { params: { day: activeDay } } : undefined;
+      const res = await api.get(endpoint, config);
       setTimetables(res.data.data.timetables || []);
       setOverrides(res.data.data.overrides || []);
     } catch (err) {
@@ -167,7 +168,7 @@ export default function TimetablePage() {
   };
 
   useEffect(() => { fetchBatches(); }, []);
-  useEffect(() => { fetchTimetable(); }, [selectedBatch]);
+  useEffect(() => { fetchTimetable(); }, [selectedBatch, activeDay]);
 
   const hasAdmin = batches.some(b => ['owner'].includes(b.myRole));
   
