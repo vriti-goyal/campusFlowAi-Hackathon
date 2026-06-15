@@ -147,6 +147,7 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
     const messages = listResponse.data.messages || [];
     let newCount = 0;
     let parsedCount = 0;
+    const backgroundTasks = [];
 
     for (const msg of messages) {
       try {
@@ -194,29 +195,37 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
         });
 
         newCount++;
+        backgroundTasks.push({ notice, rawBody, user });
+      } catch (msgErr) {
+        console.error('[Gmail Sync] Error processing message', msg.id, msgErr.message);
+      }
+    }
 
-        // Run AI parsing asynchronously (don't block the sync response)
-        setImmediate(async () => {
+    if (backgroundTasks.length > 0) {
+      setImmediate(async () => {
+        for (const task of backgroundTasks) {
           try {
-            const parsed = await parseEmailWithAI(rawBody);
+            const parsed = await parseEmailWithAI(task.rawBody);
             const { status, breakdown } = parsed
-              ? checkEligibility(parsed, user)
+              ? checkEligibility(parsed, task.user)
               : { status: 'partial', breakdown: {} };
 
-            await PlacementNotice.findByIdAndUpdate(notice._id, {
+            await PlacementNotice.findByIdAndUpdate(task.notice._id, {
               parsed,
               eligibilityStatus: status,
             });
 
             parsedCount++;
-            console.log(`[Gmail Sync] Parsed notice ${notice._id}: ${status}`);
+            console.log(`[Gmail Sync] Parsed notice ${task.notice._id}: ${status}`);
+            
+            // Delay 5 seconds to prevent Google IP rate limits
+            await new Promise(resolve => setTimeout(resolve, 5000));
           } catch (parseErr) {
-            console.error('[Gmail Sync] Parse error for notice', notice._id, parseErr.message);
+            console.error('[Gmail Sync] Parse error for notice', task.notice._id, parseErr.message);
+            await new Promise(resolve => setTimeout(resolve, 5000));
           }
-        });
-      } catch (msgErr) {
-        console.error('[Gmail Sync] Error processing message', msg.id, msgErr.message);
-      }
+        }
+      });
     }
 
     res.json({

@@ -33,7 +33,8 @@ export async function invokeAIVision(buffer, mimeType, maxTokens = 4096) {
     } catch (err) {
       const isRateLimit = err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED') || err.status === 429;
       if (isRateLimit && i < keys.length - 1) {
-        console.warn(`[Gemini Vision] Key #${(keyIndex + i) % keys.length + 1} rate-limited, trying next key...`);
+        console.warn(`[Gemini Vision] Key #${(keyIndex + i) % keys.length + 1} rate-limited, waiting 2s before trying next key...`);
+        await new Promise(r => setTimeout(r, 2000));
         continue;
       }
       if (isRateLimit) {
@@ -64,7 +65,8 @@ export async function invokeAI(prompt, maxTokens = 512) {
     } catch (err) {
       const isRateLimit = err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED') || err.status === 429;
       if (isRateLimit && i < keys.length - 1) {
-        console.warn(`[Gemini] Key #${(keyIndex + i) % keys.length + 1} rate-limited, trying next key...`);
+        console.warn(`[Gemini] Key #${(keyIndex + i) % keys.length + 1} rate-limited, waiting 2s before trying next key...`);
+        await new Promise(r => setTimeout(r, 2000));
         continue;
       }
       if (isRateLimit) {
