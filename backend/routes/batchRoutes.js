@@ -157,6 +157,55 @@ router.patch('/:batchId/courses', async (req, res) => {
   }
 });
 
+/**
+ * PATCH /api/batch/:batchId
+ * Update basic batch details and courses (owner/moderator only).
+ */
+router.patch('/:batchId', async (req, res) => {
+  try {
+    const { batchName, college, branch, semester, courses } = req.body;
+    const batch = await Batch.findById(req.params.batchId);
+    if (!batch || batch.status === 'deleted') return res.status(404).json({ error: 'Batch not found' });
+
+    const membership = await BatchMember.findOne({ batchId: batch._id, userId: req.user._id });
+    if (!membership || !['owner', 'moderator'].includes(membership.role)) {
+      return res.status(403).json({ error: 'Only owners or moderators can update a batch' });
+    }
+
+    if (batchName !== undefined) {
+      if (!batchName.trim()) return res.status(400).json({ error: 'Batch name cannot be empty' });
+      batch.batchName = batchName.trim();
+    }
+    if (college !== undefined) batch.college = college.trim();
+    if (branch !== undefined) batch.branch = branch.trim();
+    if (semester !== undefined) batch.semester = semester;
+
+    if (courses !== undefined) {
+      const seenCodes = new Set();
+      const validatedCourses = [];
+      for (const c of courses) {
+        if (!c.code?.trim() || !c.name?.trim()) {
+          return res.status(400).json({ error: 'Each course must have a code and a name' });
+        }
+        const code = c.code.trim().toUpperCase();
+        if (seenCodes.has(code)) {
+          return res.status(400).json({ error: `Duplicate course code: ${code}` });
+        }
+        seenCodes.add(code);
+        validatedCourses.push({ code, name: c.name.trim(), faculty: c.faculty?.trim() || '' });
+      }
+      batch.courses = validatedCourses;
+    }
+
+    await batch.save();
+    res.json(batch);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update batch details' });
+  }
+});
+
+
 
 // GET /api/batch/:batchId/members
 router.get('/:batchId/members', async (req, res) => {

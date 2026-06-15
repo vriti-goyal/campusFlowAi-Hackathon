@@ -1,8 +1,140 @@
 import React, { useState, useEffect } from 'react';
-import { Layers, Plus, UserPlus, Loader2, Copy, Trash2, AlertTriangle, X, BookOpen, ChevronRight, Hash } from 'lucide-react';
+import { Layers, Plus, UserPlus, Loader2, Copy, Trash2, AlertTriangle, X, BookOpen, ChevronRight, Hash, Edit3 } from 'lucide-react';
 import api from '@/lib/api';
 import { CFButton, CFCard, CFBadge, CFInput, CFSkeleton, CFEmptyState } from '@/components/ui';
 import { cn } from '@/lib/utils';
+
+// ── Edit Batch Modal ──────────────────────────────────────────────────────────
+function EditBatchModal({ batch, onClose, onEdited }) {
+  const [editForm, setEditForm] = useState({
+    batchName: batch.batchName || '',
+    college: batch.college || '',
+    branch: batch.branch || '',
+    semester: batch.semester || '',
+  });
+  const [courseRows, setCourseRows] = useState(
+    batch.courses?.length > 0 ? batch.courses : [{ code: '', name: '', faculty: '' }]
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const courses = courseRows
+        .filter(c => c.code.trim() && c.name.trim())
+        .map(c => ({ code: c.code.trim(), name: c.name.trim(), faculty: c.faculty?.trim() || '' }));
+
+      const res = await api.patch(`/api/batch/${batch._id}`, { ...editForm, courses });
+      onEdited(res.data);
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to update batch');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+      <CFCard className="max-w-2xl w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200 my-auto">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-[#6A68DF]/10 flex items-center justify-center">
+              <Edit3 size={20} className="text-[#6A68DF]" />
+            </div>
+            <h3 className="font-bold text-xl text-[var(--text-primary)]">Edit Batch</h3>
+          </div>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1">
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-xl text-sm font-medium">{error}</div>}
+
+        <form onSubmit={handleSave} className="space-y-5">
+          <div>
+            <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5 block">Batch Name <span className="text-[#6A68DF]">*</span></label>
+            <input required type="text" value={editForm.batchName} onChange={e => setEditForm({...editForm, batchName: e.target.value})} className="w-full px-4 py-2.5 bg-[var(--bg)] border border-[var(--border)] rounded-2xl text-sm focus:outline-none focus:border-[#6A68DF] focus:ring-2 focus:ring-[#6A68DF]/20 transition-all text-[var(--text-primary)]" />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5 block">College</label>
+              <input type="text" value={editForm.college} onChange={e => setEditForm({...editForm, college: e.target.value})} className="w-full px-4 py-2.5 bg-[var(--bg)] border border-[var(--border)] rounded-2xl text-sm focus:outline-none focus:border-[#6A68DF] focus:ring-2 focus:ring-[#6A68DF]/20 transition-all text-[var(--text-primary)]" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5 block">Branch</label>
+              <input type="text" value={editForm.branch} onChange={e => setEditForm({...editForm, branch: e.target.value})} className="w-full px-4 py-2.5 bg-[var(--bg)] border border-[var(--border)] rounded-2xl text-sm focus:outline-none focus:border-[#6A68DF] focus:ring-2 focus:ring-[#6A68DF]/20 transition-all text-[var(--text-primary)]" />
+            </div>
+          </div>
+          
+          <div>
+            <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5 block">Semester</label>
+            <input type="number" value={editForm.semester} onChange={e => setEditForm({...editForm, semester: e.target.value})} className="w-full px-4 py-2.5 bg-[var(--bg)] border border-[var(--border)] rounded-2xl text-sm focus:outline-none focus:border-[#6A68DF] focus:ring-2 focus:ring-[#6A68DF]/20 transition-all text-[var(--text-primary)]" />
+          </div>
+
+          <div className="pt-2 border-t border-[var(--border)]">
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-1.5">
+                <BookOpen size={14} className="text-[#6A68DF]" /> Courses <span className="text-[var(--text-muted)] font-medium lowercase normal-case">(optional)</span>
+              </label>
+              <button type="button"
+                onClick={() => setCourseRows(r => [...r, { code: '', name: '', faculty: '' }])}
+                className="text-xs text-[#6A68DF] font-bold hover:underline flex items-center gap-1 bg-[#6A68DF]/10 px-2 py-1 rounded-full">
+                <Plus size={12} /> Add row
+              </button>
+            </div>
+            <div className="space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+              {courseRows.map((row, i) => (
+                <div key={i} className="flex gap-2 items-center bg-[var(--bg)] p-2 rounded-xl border border-[var(--border)] group">
+                  <input
+                    type="text"
+                    value={row.code}
+                    onChange={e => setCourseRows(r => r.map((cr, idx) => idx === i ? { ...cr, code: e.target.value.toUpperCase() } : cr))}
+                    placeholder="Code*"
+                    className="w-20 px-2 py-1.5 bg-transparent border-none text-xs font-mono uppercase focus:ring-0 outline-none text-[var(--text-primary)] font-bold placeholder-[var(--text-muted)]"
+                  />
+                  <div className="w-px h-6 bg-[var(--border)]"></div>
+                  <input
+                    type="text"
+                    value={row.name}
+                    onChange={e => setCourseRows(r => r.map((cr, idx) => idx === i ? { ...cr, name: e.target.value } : cr))}
+                    placeholder="Subject Name*"
+                    className="flex-1 px-2 py-1.5 bg-transparent border-none text-xs focus:ring-0 outline-none text-[var(--text-primary)] font-medium placeholder-[var(--text-muted)]"
+                  />
+                  <div className="w-px h-6 bg-[var(--border)] hidden sm:block"></div>
+                  <input
+                    type="text"
+                    value={row.faculty}
+                    onChange={e => setCourseRows(r => r.map((cr, idx) => idx === i ? { ...cr, faculty: e.target.value } : cr))}
+                    placeholder="Faculty"
+                    className="w-24 px-2 py-1.5 bg-transparent border-none text-xs focus:ring-0 outline-none text-[var(--text-primary)] font-medium placeholder-[var(--text-muted)] hidden sm:block"
+                  />
+                  <button type="button" onClick={() => setCourseRows(r => r.filter((_, idx) => idx !== i))}
+                    className="text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-1.5 rounded-lg shrink-0 transition-all opacity-50 group-hover:opacity-100" title="Remove row">
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <CFButton variant="secondary" type="button" onClick={onClose} className="flex-1 py-3">
+              Cancel
+            </CFButton>
+            <CFButton disabled={saving} loading={saving} variant="primary" type="submit" className="flex-1 py-3" icon={Edit3}>
+              Save Changes
+            </CFButton>
+          </div>
+        </form>
+      </CFCard>
+    </div>
+  );
+}
 
 // ── Delete Confirmation Modal ─────────────────────────────────────────────────
 function DeleteBatchModal({ batch, onClose, onDeleted }) {
@@ -95,6 +227,7 @@ export default function BatchPage() {
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [editTarget, setEditTarget] = useState(null);
 
   const [createForm, setCreateForm] = useState({ batchName: '', college: '', branch: '', semester: '' });
   const [courseRows, setCourseRows] = useState([{ code: '', name: '', faculty: '' }]);
@@ -156,6 +289,10 @@ export default function BatchPage() {
     setBatches((prev) => prev.filter((b) => b._id !== batchId));
   };
 
+  const handleEdited = (updatedBatch) => {
+    setBatches((prev) => prev.map((b) => b._id === updatedBatch._id ? { ...b, ...updatedBatch } : b));
+  };
+
   if (loading) {
     return (
       <div className="space-y-8">
@@ -176,6 +313,15 @@ export default function BatchPage() {
           batch={deleteTarget}
           onClose={() => setDeleteTarget(null)}
           onDeleted={handleDeleted}
+        />
+      )}
+
+      {/* Edit modal */}
+      {editTarget && (
+        <EditBatchModal
+          batch={editTarget}
+          onClose={() => setEditTarget(null)}
+          onEdited={handleEdited}
         />
       )}
 
@@ -351,16 +497,30 @@ export default function BatchPage() {
                   </div>
                 )}
                 
-                {batch.myRole === 'owner' && (
-                  <CFButton
-                    variant="ghost"
-                    onClick={() => setDeleteTarget(batch)}
-                    className="mt-4 w-full text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 py-2 border border-red-100 dark:border-red-900/30"
-                    icon={Trash2}
-                    size="sm"
-                  >
-                    Delete Batch
-                  </CFButton>
+                {(batch.myRole === 'owner' || batch.myRole === 'moderator') && (
+                  <div className="flex gap-2 mt-4 pt-4 border-t border-[var(--border)]">
+                    <CFButton
+                      variant="secondary"
+                      onClick={() => setEditTarget(batch)}
+                      className="flex-1 py-2 bg-transparent hover:bg-[#6A68DF]/5 border-[#6A68DF]/20 text-[#6A68DF]"
+                      icon={Edit3}
+                      size="sm"
+                    >
+                      Edit
+                    </CFButton>
+                    
+                    {batch.myRole === 'owner' && (
+                      <CFButton
+                        variant="ghost"
+                        onClick={() => setDeleteTarget(batch)}
+                        className="flex-1 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 py-2 border border-red-100 dark:border-red-900/30"
+                        icon={Trash2}
+                        size="sm"
+                      >
+                        Delete
+                      </CFButton>
+                    )}
+                  </div>
                 )}
               </CFCard>
             ))}
