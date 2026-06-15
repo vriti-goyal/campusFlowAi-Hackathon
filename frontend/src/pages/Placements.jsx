@@ -7,6 +7,80 @@ import { cn } from '@/lib/utils';
 import { useGmail } from '@/hooks/useGmail';
 import toast from 'react-hot-toast';
 
+const MOCK_PLACEMENTS = [
+  {
+    _id: 'mock-placement-1',
+    _isMock: true,
+    company: 'Google',
+    role: 'Software Engineer Intern',
+    package: 'INR 45 LPA (PPO)',
+    minimumCgpa: 8.0,
+    eligibleBranches: ['CSE', 'IT', 'ECE'],
+    deadline: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
+    source: 'gmail',
+    priorityScore: 92,
+    applicationStatus: 'Not Applied',
+    eligibilityStatus: 'eligible',
+    applicationLink: 'https://careers.google.com/'
+  },
+  {
+    _id: 'mock-placement-2',
+    _isMock: true,
+    company: 'Microsoft',
+    role: 'SDE-1',
+    package: 'INR 54 LPA CTC',
+    minimumCgpa: 7.5,
+    eligibleBranches: ['CSE', 'IT'],
+    deadline: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+    source: 'gmail',
+    priorityScore: 88,
+    applicationStatus: 'Not Applied',
+    eligibilityStatus: 'eligible',
+    applicationLink: 'https://careers.microsoft.com/'
+  },
+  {
+    _id: 'mock-placement-3',
+    _isMock: true,
+    company: 'Deloitte',
+    role: 'Analyst',
+    package: 'INR 9.5 LPA',
+    minimumCgpa: 6.5,
+    eligibleBranches: ['All Branches'],
+    deadline: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString(),
+    source: 'upload',
+    priorityScore: 64,
+    applicationStatus: 'Not Applied',
+    eligibilityStatus: 'eligible',
+    applicationLink: 'https://www2.deloitte.com/'
+  },
+  {
+    _id: 'mock-placement-4',
+    _isMock: true,
+    company: 'TCS Digital',
+    role: 'Systems Engineer',
+    package: 'INR 7.0 LPA',
+    minimumCgpa: 7.0,
+    eligibleBranches: ['CSE', 'IT', 'EEE', 'ECE'],
+    deadline: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    source: 'upload',
+    priorityScore: 52,
+    applicationStatus: 'Not Applied',
+    eligibilityStatus: 'eligible',
+    applicationLink: 'https://www.tcs.com/careers'
+  }
+];
+
+const getMockStats = () => {
+  const now = new Date();
+  const twoDays = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+  return {
+    total: MOCK_PLACEMENTS.length,
+    eligible: MOCK_PLACEMENTS.filter((p) => p.eligibilityStatus === 'eligible').length,
+    applied: MOCK_PLACEMENTS.filter((p) => p.applicationStatus === 'Applied').length,
+    deadlineSoon: MOCK_PLACEMENTS.filter((p) => p.deadline && new Date(p.deadline) >= now && new Date(p.deadline) <= twoDays).length
+  };
+};
+
 export default function PlacementsPage() {
   const { dbUser } = useAuth();
   const [placements, setPlacements] = useState([]);
@@ -22,6 +96,7 @@ export default function PlacementsPage() {
   const [syncResult, setSyncResult] = useState(null);
 
   const gmail = useGmail();
+  const isUsingMockData = placements.some((p) => p._isMock);
 
   const fetchData = async () => {
     try {
@@ -35,9 +110,18 @@ export default function PlacementsPage() {
 
       const batches = batchRes.data || [];
       const res = await api.get('/api/placements');
-      setPlacements(res.data.data || []);
+      const livePlacements = res.data.data || [];
+
+      if (livePlacements.length > 0) {
+        setPlacements(livePlacements);
+      } else {
+        setPlacements(MOCK_PLACEMENTS);
+        if (!statsRes.data.data) setStats(getMockStats());
+      }
     } catch {
-      toast.error('Failed to load placements');
+      setPlacements(MOCK_PLACEMENTS);
+      setStats(getMockStats());
+      toast('Showing demo placement data', { icon: 'ℹ️' });
     } finally {
       setLoading(false);
     }
@@ -72,6 +156,16 @@ export default function PlacementsPage() {
 
   const handleApply = async (id) => {
     setApplying(id);
+    const placement = placements.find((p) => p._id === id);
+    if (placement?._isMock) {
+      setPlacements((prev) =>
+        prev.map((p) => (p._id === id ? { ...p, applicationStatus: 'Applied', appliedAt: new Date().toISOString() } : p))
+      );
+      toast.success('Marked as applied');
+      setApplying(null);
+      return;
+    }
+
     try {
       await api.post(`/api/placements/${id}/apply`);
       setPlacements((prev) =>
@@ -87,6 +181,15 @@ export default function PlacementsPage() {
   };
 
   const handleDismiss = async (id) => {
+    const placement = placements.find((p) => p._id === id);
+    if (placement?._isMock) {
+      setPlacements((prev) =>
+        prev.map((p) => (p._id === id ? { ...p, applicationStatus: 'Dismissed' } : p))
+      );
+      toast.success('Placement dismissed');
+      return;
+    }
+
     try {
       await api.patch(`/api/placements/${id}/dismiss`);
       setPlacements((prev) =>
@@ -201,6 +304,11 @@ export default function PlacementsPage() {
       <div>
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Placement Hub</h1>
         <p className="text-[var(--text-secondary)] text-sm mt-1">Opportunities curated based on your profile</p>
+        {isUsingMockData && (
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+            Demo Data
+          </div>
+        )}
       </div>
 
       {/* Gmail Banner */}
@@ -261,7 +369,7 @@ export default function PlacementsPage() {
             <div className="flex items-center gap-2 text-[var(--text-secondary)] font-medium">
               <Clock size={18} className={cn("text-red-500", stats.deadlineSoon > 0 && "animate-pulse")} /> Deadline Soon
             </div>
-            <div className="text-2xl font-bold text-red-500">{stats.deadlineSoon}</div>
+            <div className="text-2xl font-bold text-white">{stats.deadlineSoon}</div>
             {stats.deadlineSoon > 0 && <div className="absolute top-0 right-0 w-2 h-2 rounded-full bg-red-500 m-4 animate-ping" />}
           </CFCard>
         </div>

@@ -297,7 +297,7 @@ export default function AssignmentsPage() {
             else if (a.priorityLevel === 'low') priorityVariant = "low";
 
             return (
-              <CFCard key={a._id} className={cn("flex flex-col h-full", isOverdue && "border-l-4 border-l-yellow-500")}>
+              <CFCard key={a._id} className={cn("flex flex-col h-full", isOverdue && "border-l-4 border-l-blue-500")}>
                 <div className="flex items-start justify-between mb-3 gap-2">
                   <div className="flex flex-wrap gap-2">
                     {a.batchId?.batchName && (
