@@ -176,7 +176,7 @@ function UploadPanel({ batches, onUploaded }) {
 }
 
 // ── Main Notices Page ────────────────────────────────────────────────────────
-const CATEGORIES = ['all', 'academic', 'assignment', 'exam', 'placement', 'event', 'general'];
+const CATEGORIES = ['academic', 'placement', 'event', 'general'];
 
 export default function NoticesPage() {
   const { user } = useAuth();
@@ -184,8 +184,10 @@ export default function NoticesPage() {
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [category, setCategory] = useState('all');
+  const [category, setCategory] = useState('academic');
   const [expandedPosts, setExpandedPosts] = useState({});
+  const [editingPost, setEditingPost] = useState(null);
+  const [editForm, setEditForm] = useState({ title: '', summary: '', originalText: '', type: 'general' });
   const toggleExpand = id => setExpandedPosts(p => ({ ...p, [id]: !p[id] }));
 
   useEffect(() => {
@@ -221,6 +223,25 @@ export default function NoticesPage() {
   const handleDelete = async (postId) => {
     if (!confirm('Delete this notice?')) return;
     try { await api.delete(`/api/posts/${postId}`); fetchPosts(); } catch { alert('Failed to delete'); }
+  };
+
+  const startEdit = (post) => {
+    setEditingPost(post._id);
+    setEditForm({
+      title: post.title || '',
+      summary: post.summary || '',
+      originalText: post.originalText || '',
+      type: post.type || 'general'
+    });
+  };
+
+  const handleEditSubmit = async (e, postId) => {
+    e.preventDefault();
+    try {
+      await api.put(`/api/posts/${postId}`, editForm);
+      setEditingPost(null);
+      fetchPosts();
+    } catch { alert('Failed to edit'); }
   };
 
   if (loading) return (
@@ -317,19 +338,58 @@ export default function NoticesPage() {
                       </div>
                     </div>
 
-                    <h3 className="text-base font-semibold text-[var(--text-primary)] mb-2">{post.title}</h3>
+                    {editingPost === post._id ? (
+                      <form onSubmit={(e) => handleEditSubmit(e, post._id)} className="space-y-3 mb-4">
+                        <input
+                          type="text"
+                          value={editForm.title}
+                          onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                          className="w-full px-3 py-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg text-sm"
+                          placeholder="Title"
+                        />
+                        <select
+                          value={editForm.type}
+                          onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}
+                          className="w-full px-3 py-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg text-sm"
+                        >
+                          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                        <textarea
+                          value={editForm.originalText}
+                          onChange={(e) => setEditForm({ ...editForm, originalText: e.target.value })}
+                          className="w-full px-3 py-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg text-sm resize-none"
+                          rows={4}
+                          placeholder="Original Text"
+                        />
+                        <textarea
+                          value={editForm.summary}
+                          onChange={(e) => setEditForm({ ...editForm, summary: e.target.value })}
+                          className="w-full px-3 py-2 bg-[var(--bg)] border border-[var(--border)] rounded-lg text-sm resize-none"
+                          rows={2}
+                          placeholder="Summary"
+                        />
+                        <div className="flex gap-2">
+                          <CFButton type="submit" variant="primary" size="sm">Save</CFButton>
+                          <CFButton type="button" variant="ghost" size="sm" onClick={() => setEditingPost(null)}>Cancel</CFButton>
+                        </div>
+                      </form>
+                    ) : (
+                      <>
+                        <h3 className="text-base font-semibold text-[var(--text-primary)] mb-2">{post.title}</h3>
 
-                    <div className={cn('text-sm text-[var(--text-secondary)]', !expandedPosts[post._id] && 'line-clamp-3')}>
-                      {post.summary || post.originalText}
-                    </div>
-                    {(post.summary || post.originalText) && (
-                      <button
-                        onClick={() => toggleExpand(post._id)}
-                        className="flex items-center gap-1 text-xs text-[#6A68DF] mt-2 font-medium hover:underline"
-                      >
-                        {expandedPosts[post._id] ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                        {expandedPosts[post._id] ? 'Show less' : 'Read more'}
-                      </button>
+                        <div className={cn('text-sm text-[var(--text-secondary)]', !expandedPosts[post._id] && 'line-clamp-3')}>
+                          {post.summary || post.originalText}
+                        </div>
+                        {(post.summary || post.originalText) && (
+                          <button
+                            onClick={() => toggleExpand(post._id)}
+                            className="flex items-center gap-1 text-xs text-[#6A68DF] mt-2 font-medium hover:underline"
+                          >
+                            {expandedPosts[post._id] ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                            {expandedPosts[post._id] ? 'Show less' : 'Read more'}
+                          </button>
+                        )}
+                      </>
                     )}
 
                     <div className="flex items-center justify-between mt-4 pt-3 border-t border-[var(--border)]">
@@ -355,10 +415,16 @@ export default function NoticesPage() {
                           </>
                         )}
                         {(isMod || post.uploadedBy?._id === user?.uid) && (
-                          <CFButton variant="ghost" size="sm" onClick={() => handleDelete(post._id)}
-                            className="text-[var(--text-muted)] hover:text-red-500 hover:bg-red-500/10">
-                            <Trash2 size={15} className="mr-1" /> Delete
-                          </CFButton>
+                          <>
+                            <CFButton variant="ghost" size="sm" onClick={() => startEdit(post)}
+                              className="text-[var(--text-muted)] hover:text-blue-500 hover:bg-blue-500/10">
+                              <FileText size={15} className="mr-1" /> Edit
+                            </CFButton>
+                            <CFButton variant="ghost" size="sm" onClick={() => handleDelete(post._id)}
+                              className="text-[var(--text-muted)] hover:text-red-500 hover:bg-red-500/10">
+                              <Trash2 size={15} className="mr-1" /> Delete
+                            </CFButton>
+                          </>
                         )}
                       </div>
                     </div>

@@ -142,4 +142,32 @@ router.delete('/:postId', async (req, res) => {
   }
 });
 
+// PUT /api/posts/:postId
+router.put('/:postId', async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.postId);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    const member = await BatchMember.findOne({ batchId: post.batchId, userId: req.user._id });
+    const isUploader = post.uploadedBy.toString() === req.user._id.toString();
+    const isMod = member && (member.role === 'owner' || member.role === 'moderator');
+
+    if (!isUploader && !isMod) {
+      return res.status(403).json({ error: 'Not authorized to edit this post' });
+    }
+
+    const { title, summary, originalText, type } = req.body;
+    if (title !== undefined) post.title = title;
+    if (summary !== undefined) post.summary = summary;
+    if (originalText !== undefined) post.originalText = originalText;
+    if (type !== undefined) post.type = type;
+
+    await post.save();
+    res.json(post);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update post' });
+  }
+});
+
 export default router;
