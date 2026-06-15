@@ -11,17 +11,17 @@ const CFBadge = ({
   
   // Mapping variants exactly as described
   const variants = {
-    high: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-    danger: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-    medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-    warning: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-    low: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-    info: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-    success: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    eligible: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    applied: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    missed: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400',
-    default: 'bg-[#6A68DF]/10 text-[#6A68DF]',
+    high: 'bg-red-50 text-yellow-600 dark:bg-black-900/20 dark:text-black-300',
+    danger: 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-300',
+    medium: 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300',
+    warning: 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300',
+    low: 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300',
+    info: 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300',
+    success: 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-300',
+    eligible: 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-300',
+    applied: 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-300',
+    missed: 'bg-gray-50 text-gray-600 dark:bg-gray-800/60 dark:text-gray-300',
+    default: 'bg-[#6A68DF]/8 text-[#6A68DF]',
   };
 
   return (
