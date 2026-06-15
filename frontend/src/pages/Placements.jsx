@@ -370,7 +370,7 @@ export default function PlacementsPage() {
               <Clock size={18} className={cn("text-red-500", stats.deadlineSoon > 0 && "animate-pulse")} /> Deadline Soon
             </div>
             <div className="text-2xl font-bold text-white">{stats.deadlineSoon}</div>
-            {stats.deadlineSoon > 0 && <div className="absolute top-0 right-0 w-2 h-2 rounded-full bg-red-500 m-4 animate-ping" />}
+            {stats.deadlineSoon > 0 && <div className="absolute top-0 right-0 w-2 h-2 rounded-full bg-blue-500 m-4 animate-ping" />}
           </CFCard>
         </div>
       )}
