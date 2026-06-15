@@ -4,8 +4,8 @@ import api from '@/lib/api';
 import { CFButton, CFCard, CFBadge, CFSkeleton, CFEmptyState } from '@/components/ui';
 import { cn } from '@/lib/utils';
 
-// ── Inline Upload Modal ────────────────────────────────────────────────────────
-function UploadModal({ batches, onClose, onUploaded }) {
+// ── Inline Upload Panel ────────────────────────────────────────────────────────
+function UploadPanel({ batches, onUploaded }) {
   const fileInputRef = useRef(null);
   const [mode, setMode] = useState('file');
   const [file, setFile] = useState(null);
@@ -29,6 +29,7 @@ function UploadModal({ batches, onClose, onUploaded }) {
         const res = await api.post('/api/upload/file', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
         setSuccess(res.data?.message || 'Assignment notice uploaded!');
         setFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
       } else {
         if (!text.trim()) { setError('Please enter notice text.'); setLoading(false); return; }
         const res = await api.post('/api/upload/text', { batchId, targetBatchId: batchId, text });
@@ -44,20 +45,13 @@ function UploadModal({ batches, onClose, onUploaded }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <CFCard className="max-w-lg w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-        <div className="flex items-start justify-between mb-5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#6A68DF]/10 flex items-center justify-center">
-              <Upload size={20} className="text-[#6A68DF]" />
-            </div>
-            <div>
-              <h3 className="font-bold text-[var(--text-primary)] text-lg">Upload Assignment Notice</h3>
-              <p className="text-xs text-[var(--text-muted)]">AI will extract title, deadline, and details automatically</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1"><X size={20} /></button>
+    <CFCard className="p-5 space-y-4 border-[#6A68DF]/20">
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 rounded-full bg-[#6A68DF]/10 flex items-center justify-center">
+          <Upload size={16} className="text-[#6A68DF]" />
         </div>
+        <h3 className="font-bold text-[var(--text-primary)]">Upload Assignment</h3>
+      </div>
 
         <div className="mb-4">
           <label className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5 block">Post To Batch</label>
@@ -128,14 +122,12 @@ function UploadModal({ batches, onClose, onUploaded }) {
           )}
 
           <div className="flex gap-3">
-            <CFButton type="button" variant="secondary" onClick={onClose} className="flex-1 py-2.5">Cancel</CFButton>
-            <CFButton type="submit" variant="primary" className="flex-1 py-2.5" loading={loading} disabled={loading} icon={loading ? Loader2 : Send}>
-              {loading ? 'Processing...' : 'Upload'}
+            <CFButton type="submit" variant="primary" className="w-full py-2.5" loading={loading} disabled={loading} icon={loading ? Loader2 : Send}>
+              {loading ? 'Processing...' : 'Upload Assignment'}
             </CFButton>
           </div>
         </form>
-      </CFCard>
-    </div>
+    </CFCard>
   );
 }
 
@@ -145,7 +137,6 @@ export default function AssignmentsPage() {
   const [updating, setUpdating] = useState(null);
   const [activeTab, setActiveTab] = useState('Not Started');
   const [batches, setBatches] = useState([]);
-  const [showUpload, setShowUpload] = useState(false);
 
   const fetchAssignments = async () => {
     try {
@@ -223,15 +214,7 @@ export default function AssignmentsPage() {
   }
 
   return (
-    <div className="space-y-8 pb-10">
-      {showUpload && (
-        <UploadModal
-          batches={batches}
-          onClose={() => setShowUpload(false)}
-          onUploaded={() => { fetchAssignments(); setShowUpload(false); }}
-        />
-      )}
-
+    <div className="space-y-6 max-w-6xl pb-10">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
@@ -239,12 +222,19 @@ export default function AssignmentsPage() {
           </h1>
           <p className="text-[var(--text-secondary)] text-sm mt-1">Track and manage your assignments</p>
         </div>
-        <div className="flex items-center gap-3">
-          <CFButton variant="primary" size="sm" onClick={() => setShowUpload(true)} icon={Upload}>
-            Upload Assignment
-          </CFButton>
-        </div>
       </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left: Upload Panel */}
+        <div className="lg:col-span-1">
+          <UploadPanel
+            batches={batches}
+            onUploaded={fetchAssignments}
+          />
+        </div>
+
+        {/* Right: Content */}
+        <div className="lg:col-span-2 space-y-4">
 
       {/* Status Tabs */}
       <div className="flex overflow-x-auto pb-2 gap-2 hide-scrollbar">
@@ -272,7 +262,7 @@ export default function AssignmentsPage() {
           description="You're all caught up in this category!"
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
           {filteredAssignments.map((a) => {
             const isOverdue = a.status === 'Missed' || (a.status !== 'Submitted' && a.deadline && new Date(a.deadline) < new Date());
             
@@ -347,6 +337,8 @@ export default function AssignmentsPage() {
           })}
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }
