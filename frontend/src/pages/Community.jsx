@@ -235,6 +235,11 @@ export default function CommunityPage() {
               <CFCard key={post._id} className={cn("transition-all", isDuplicateCollapsed ? "opacity-60" : "")}>
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex flex-wrap items-center gap-2">
+                    {post.batchId?.batchName && (
+                      <CFBadge variant="outline" className="bg-[var(--background)]">
+                        {post.batchId.batchName}
+                      </CFBadge>
+                    )}
                     <CFBadge variant="default" className="capitalize">{post.type}</CFBadge>
                     
                     <CFBadge variant={badgeVariant} className="flex items-center gap-1">

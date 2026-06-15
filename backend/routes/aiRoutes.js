@@ -5,6 +5,7 @@ import { Assignment } from '../models/Assignment.js';
 import { Exam } from '../models/Exam.js';
 import { Placement } from '../models/Placement.js';
 import { StudentPlacementStatus } from '../models/StudentPlacementStatus.js';
+import { StudentAssignmentStatus } from '../models/StudentAssignmentStatus.js';
 import { CalendarEvent } from '../models/CalendarEvent.js';
 import { Post } from '../models/Post.js';
 import { Timetable } from '../models/Timetable.js';
@@ -35,10 +36,16 @@ async function gatherUserContext(user) {
     ? { name: user.name, branch: user.branch, cgpa: user.cgpa, semester: user.semester, backlogs: user.backlogs || 0 }
     : { name: 'Student', branch: '', cgpa: 0, semester: 0, backlogs: 0 };
 
+  const submittedAssignmentStatuses = await StudentAssignmentStatus.find({
+    userId: user._id,
+    status: 'Submitted',
+  }).lean();
+  const submittedAssignmentIds = submittedAssignmentStatuses.map(s => s.assignmentId);
+
   // Pending assignments
   const assignments = await Assignment.find({
     $or: [{ userId: user._id }, { batchId: { $in: userBatches } }],
-    status: { $ne: 'Submitted' },
+    _id: { $nin: submittedAssignmentIds },
   })
     .sort({ deadline: 1 })
     .limit(5)
@@ -148,9 +155,15 @@ async function gatherDigestContext(user) {
 
   const name = user?.name || 'Student';
 
+  const submittedAssignmentStatuses = await StudentAssignmentStatus.find({
+    userId: user._id,
+    status: 'Submitted',
+  }).lean();
+  const submittedAssignmentIds = submittedAssignmentStatuses.map(s => s.assignmentId);
+
   const pendingAssignments = await Assignment.countDocuments({
     $or: [{ userId: user._id }, { batchId: { $in: userBatches } }],
-    status: { $ne: 'Submitted' },
+    _id: { $nin: submittedAssignmentIds },
   });
 
   const upcomingExams = await Exam.countDocuments({
@@ -172,7 +185,7 @@ async function gatherDigestContext(user) {
 
   const nextAssignment = await Assignment.findOne({
     $or: [{ userId: user._id }, { batchId: { $in: userBatches } }],
-    status: { $ne: 'Submitted' },
+    _id: { $nin: submittedAssignmentIds },
     deadline: { $gte: now },
   }).sort({ deadline: 1 }).lean();
 

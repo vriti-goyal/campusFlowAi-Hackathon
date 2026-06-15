@@ -16,7 +16,9 @@ router.get('/', verifyFirebaseToken, async (req, res) => {
     const filter = {};
     if (batchId) filter.batchId = batchId;
 
-    const exams = await Exam.find(filter).sort({ date: 1 });
+    const exams = await Exam.find(filter)
+      .sort({ date: 1 })
+      .populate('batchId', 'batchName');
     return ok(res, exams);
   } catch (err) {
     return fail(res, err.message, 500);

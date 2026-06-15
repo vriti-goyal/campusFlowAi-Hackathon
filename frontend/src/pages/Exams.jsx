@@ -155,6 +155,7 @@ export default function ExamsPage() {
       venue: e.venue,
       source: 'schedule',
       courseCode: e.courseCode,
+      batchId: e.batchId,
     })),
     ...legacyExams.map(e => ({
       _id: e._id,
@@ -163,6 +164,7 @@ export default function ExamsPage() {
       time: e.time,
       venue: e.venue,
       source: 'legacy',
+      batchId: e.batchId,
     })),
   ].sort((a, b) => new Date(a.date) - new Date(b.date));
 
@@ -282,9 +284,16 @@ export default function ExamsPage() {
                   gradient={isToday ? true : false}
                 >
                   <div className="flex justify-between items-start mb-3 gap-2">
-                    <h3 className={cn("font-semibold text-lg leading-snug", isToday ? "text-white" : "text-[var(--text-primary)]")}>
-                      {exam.subject}
-                    </h3>
+                    <div>
+                      <h3 className={cn("font-semibold text-lg leading-snug", isToday ? "text-white" : "text-[var(--text-primary)]")}>
+                        {exam.subject}
+                      </h3>
+                      {exam.batchId?.batchName && (
+                        <CFBadge variant="outline" className={cn("mt-1 text-[10px] px-1.5 py-0", isToday ? "border-white/40 text-white/90" : "bg-[var(--background)]")}>
+                          {exam.batchId.batchName}
+                        </CFBadge>
+                      )}
+                    </div>
                     <CFBadge variant={isToday ? "default" : getDaysLeftVariant(daysLeft)} className={isToday ? "bg-white/20 text-white" : "whitespace-nowrap"}>
                       {getDaysLeftText(daysLeft)}
                     </CFBadge>

@@ -395,6 +395,11 @@ function PlacementCard({ placement: p, onApply, onDismiss, onRemind, applying, u
           </div>
         </div>
         <div className="flex flex-col gap-1 items-end shrink-0">
+          {p.batchId?.batchName && (
+            <CFBadge variant="outline" className="text-[10px] px-1.5 py-0 bg-[var(--background)]">
+              {p.batchId.batchName}
+            </CFBadge>
+          )}
           <CFBadge variant="default" className="text-[10px] px-1.5 py-0">
             {p.source === 'gmail' ? '📧 Gmail' : '📄 Upload'}
           </CFBadge>

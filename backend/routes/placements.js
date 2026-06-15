@@ -123,7 +123,9 @@ router.get('/', verifyFirebaseToken, async (req, res) => {
       ];
     }
 
-    const placements = await Placement.find(filter).sort({ deadline: 1 });
+    const placements = await Placement.find(filter)
+      .sort({ deadline: 1 })
+      .populate('batchId', 'batchName');
 
     // Get user's profile for eligibility check
     const userCgpa = req.user.cgpa || 0;

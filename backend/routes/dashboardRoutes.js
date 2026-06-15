@@ -4,6 +4,7 @@ import { Assignment } from '../models/Assignment.js';
 import { Exam } from '../models/Exam.js';
 import { Placement } from '../models/Placement.js';
 import { StudentPlacementStatus } from '../models/StudentPlacementStatus.js';
+import { StudentAssignmentStatus } from '../models/StudentAssignmentStatus.js';
 import { CalendarEvent } from '../models/CalendarEvent.js';
 import { Post } from '../models/Post.js';
 import { BatchMember } from '../models/BatchMember.js';
@@ -29,10 +30,19 @@ router.get('/summary', async (req, res) => {
     const urgentAlerts = [];
     const counts = { assignments: 0, exams: 0, placements: 0, events: 0, urgent: 0 };
 
+    const memberships = await BatchMember.find({ userId }).lean();
+    const userBatches = memberships.map(m => m.batchId);
+
+    const submittedAssignmentStatuses = await StudentAssignmentStatus.find({
+      userId,
+      status: 'Submitted'
+    }).lean();
+    const submittedAssignmentIds = submittedAssignmentStatuses.map(s => s.assignmentId);
+
     // 1. Assignments
     const assignments = await Assignment.find({ 
-      userId, 
-      status: { $ne: 'Submitted' },
+      $or: [{ userId }, { batchId: { $in: userBatches } }],
+      _id: { $nin: submittedAssignmentIds },
       deadline: { $lte: in7Days, $gte: now } 
     }).lean();
     
@@ -49,7 +59,7 @@ router.get('/summary', async (req, res) => {
 
     // 2. Exams
     const exams = await Exam.find({
-      userId,
+      $or: [{ userId }, { batchId: { $in: userBatches } }],
       date: { $lte: in14Days, $gte: now }
     }).lean();
     

@@ -140,6 +140,11 @@ export default function AssignmentsPage() {
               <CFCard key={a._id} className={cn("flex flex-col h-full", isOverdue && "border-l-4 border-l-red-500")}>
                 <div className="flex items-start justify-between mb-3 gap-2">
                   <div className="flex flex-wrap gap-2">
+                    {a.batchId?.batchName && (
+                      <CFBadge variant="outline" className="text-[10px] bg-[var(--background)]">
+                        {a.batchId.batchName}
+                      </CFBadge>
+                    )}
                     {a.subject && (
                       <CFBadge variant="default" className="text-[10px]">
                         {a.subject}
