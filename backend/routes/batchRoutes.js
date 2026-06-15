@@ -227,19 +227,13 @@ router.delete('/:batchId', async (req, res) => {
       });
     }
 
-    // Guard: refuse if there are other active members enrolled (besides the owner)
-    const memberCount = await BatchMember.countDocuments({ batchId: batch._id });
-    if (memberCount > 1) {
-      return res.status(409).json({
-        error: `Cannot delete a batch with ${memberCount - 1} active member(s) still enrolled. Remove all members first.`,
-        memberCount,
-      });
-    }
-
     // Soft delete (archive) — NEVER hard delete
     batch.status = 'deleted';
     batch.deletedAt = new Date();
     await batch.save();
+
+    // Delete all batch memberships so it disappears from all members
+    await BatchMember.deleteMany({ batchId: batch._id });
 
     console.log(`[Batch] Archived batch ${batch._id} ("${batch.batchName}") by user ${req.user._id}`);
 
