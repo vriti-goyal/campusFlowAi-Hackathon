@@ -3,8 +3,8 @@ import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   Zap, Sun, Moon, LayoutDashboard, FileText, 
-  Calendar as CalendarIcon, Users, Briefcase, 
-  UploadCloud, MessageSquare, User, UsersRound, 
+  Calendar as CalendarIcon, Bell, Briefcase, 
+  MessageSquare, User, UsersRound, 
   LogOut 
 } from 'lucide-react';
 import { CFButton } from '@/components/ui';
@@ -28,9 +28,8 @@ const NAV_SECTIONS = [
   {
     label: 'CAMPUS',
     items: [
-      { path: '/community', label: 'Community', icon: Users },
+      { path: '/notices', label: 'Notices', icon: Bell },
       { path: '/placements', label: 'Placements', icon: Briefcase },
-      { path: '/upload', label: 'Upload', icon: UploadCloud }
     ]
   },
   {
@@ -47,6 +46,7 @@ const NAV_SECTIONS = [
     ]
   }
 ];
+
 
 const Sidebar = ({ isOpen, setOpen }) => {
   const { dbUser, logout } = useAuth();

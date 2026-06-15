@@ -13,17 +13,16 @@ import DashboardLayout from './layouts/DashboardLayout';
 import LoginPage from './pages/Login';
 import ProfileSetupPage from './pages/ProfileSetup';
 import DashboardPage from './pages/Dashboard';
-import CommunityPage from './pages/Community';
 import AssignmentsPage from './pages/Assignments';
 import ExamsPage from './pages/Exams';
 import PlacementsPage from './pages/Placements';
 import CalendarPage from './pages/Calendar';
 import TimetablePage from './pages/Timetable';
 import AssistantPage from './pages/Assistant';
-import UploadPage from './pages/Upload';
 import BatchPage from './pages/Batch';
 import ProfilePage from './pages/Profile';
 import PlacementNoticesPage from './pages/PlacementNotices';
+import NoticesPage from './pages/Notices';
 
 /** Redirect unauthenticated users to /login.
  *  Redirect users with incomplete profiles to /setup. */
@@ -67,7 +66,7 @@ export default function App() {
             >
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard"          element={<DashboardPage />} />
-              <Route path="community"          element={<CommunityPage />} />
+              <Route path="notices"            element={<NoticesPage />} />
               <Route path="assignments"        element={<AssignmentsPage />} />
               <Route path="exams"              element={<ExamsPage />} />
               <Route path="placements"         element={<PlacementsPage />} />
@@ -75,7 +74,6 @@ export default function App() {
               <Route path="calendar"           element={<CalendarPage />} />
               <Route path="timetable"          element={<TimetablePage />} />
               <Route path="assistant"          element={<AssistantPage />} />
-              <Route path="upload"             element={<UploadPage />} />
               <Route path="batch"              element={<BatchPage />} />
               <Route path="profile"            element={<ProfilePage />} />
             </Route>
