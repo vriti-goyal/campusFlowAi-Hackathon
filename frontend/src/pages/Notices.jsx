@@ -184,7 +184,7 @@ export default function NoticesPage() {
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [category, setCategory] = useState('academic');
+  const [category, setCategory] = useState('all');
   const [expandedPosts, setExpandedPosts] = useState({});
   const [editingPost, setEditingPost] = useState(null);
   const [editForm, setEditForm] = useState({ title: '', summary: '', originalText: '', type: 'general' });
@@ -286,24 +286,6 @@ export default function NoticesPage() {
 
           {/* Right: Feed */}
           <div className="lg:col-span-2 space-y-4">
-            {/* Category Filter */}
-            <div className="flex flex-wrap gap-2">
-              {CATEGORIES.map(c => (
-                <button
-                  key={c}
-                  onClick={() => setCategory(c)}
-                  className={cn(
-                    'inline-flex items-center justify-center rounded-full px-4 py-1.5 text-xs font-medium whitespace-nowrap transition-all duration-200',
-                    category === c
-                      ? 'bg-[#6A68DF] text-white'
-                      : 'bg-[var(--card)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg)] hover:text-[var(--text-primary)]'
-                  )}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-
             {/* Posts */}
             {posts.length === 0 ? (
               <CFEmptyState title="No notices" description="No notices in this category yet." />

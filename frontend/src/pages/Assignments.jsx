@@ -324,12 +324,21 @@ export default function AssignmentsPage() {
 
                   <div className="flex flex-wrap gap-2 pt-2 border-t border-[var(--border)]">
                     {a.status !== 'Submitted' && (
-                      <CFButton
-                        onClick={() => alert('Reminder set! (stub)')}
-                        icon={Bell} size="sm" variant="ghost" className="flex-1 text-xs py-1.5"
-                      >
-                        Remind
-                      </CFButton>
+                      <>
+                        <CFButton
+                          onClick={() => alert('Reminder set! (stub)')}
+                          icon={Bell} size="sm" variant="ghost" className="flex-1 text-xs py-1.5"
+                        >
+                          Remind
+                        </CFButton>
+                        <CFButton
+                          onClick={() => updateStatus(a._id, 'Submitted')}
+                          icon={Upload} size="sm" variant="primary" className="flex-1 text-xs py-1.5"
+                          loading={updating === a._id}
+                        >
+                          Upload
+                        </CFButton>
+                      </>
                     )}
                   </div>
                 </div>
