@@ -5,7 +5,7 @@ import { CFButton, CFCard, CFBadge, CFSkeleton, CFEmptyState } from '@/component
 import { cn } from '@/lib/utils';
 
 // ── Inline Upload Panel ────────────────────────────────────────────────────────
-function UploadPanel({ batches, onUploaded }) {
+function UploadPanel({ batches, onUploaded, onClose }) {
   const fileInputRef = useRef(null);
   const [mode, setMode] = useState('file');
   const [file, setFile] = useState(null);
@@ -46,11 +46,16 @@ function UploadPanel({ batches, onUploaded }) {
 
   return (
     <CFCard className="p-5 space-y-4 border-[#6A68DF]/20">
-      <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-full bg-[#6A68DF]/10 flex items-center justify-center">
-          <Upload size={16} className="text-[#6A68DF]" />
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-[#6A68DF]/10 flex items-center justify-center">
+            <Upload size={16} className="text-[#6A68DF]" />
+          </div>
+          <h3 className="font-bold text-[var(--text-primary)]">Upload assignment</h3>
         </div>
-        <h3 className="font-bold text-[var(--text-primary)]">Upload assignment</h3>
+        {onClose && (
+          <CFButton variant="ghost" size="sm" onClick={onClose} icon={X} className="px-2 py-2" />
+        )}
       </div>
 
         <div className="mb-4">
@@ -236,14 +241,20 @@ export default function AssignmentsPage() {
       </div>
 
       {showUpload && (
-        <div className="max-w-2xl">
+        <div
+          className="fixed inset-0 z-50 bg-black/45 backdrop-blur-[1px] p-4 flex items-center justify-center"
+          onClick={() => setShowUpload(false)}
+        >
+          <div className="w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
           <UploadPanel
             batches={batches}
             onUploaded={() => {
               fetchAssignments();
               setShowUpload(false);
             }}
+            onClose={() => setShowUpload(false)}
           />
+          </div>
         </div>
       )}
 
