@@ -9,13 +9,18 @@ const router = Router();
 
 /**
  * GET /api/assignments
- * Query: batchId (required)
+ * Query: batchId (optional)
  */
 router.get('/', verifyFirebaseToken, async (req, res) => {
   try {
     const { batchId } = req.query;
     const filter = {};
-    if (batchId) filter.batchId = batchId;
+    if (batchId) {
+      filter.batchId = batchId;
+    } else {
+      filter.userId = req.user._id;
+      filter.batchId = null;
+    }
 
     const assignments = await Assignment.find(filter).sort({ deadline: 1 });
     return ok(res, assignments);
@@ -53,7 +58,8 @@ router.post('/', verifyFirebaseToken, async (req, res) => {
     });
 
     const assignment = await Assignment.create({
-      batchId,
+      userId: req.user._id,
+      batchId: batchId === 'personal' ? null : batchId,
       postId: postId || null,
       title,
       subject: subject || '',
@@ -69,7 +75,7 @@ router.post('/', verifyFirebaseToken, async (req, res) => {
     if (deadline) {
       await CalendarEvent.create({
         userId: req.user._id,
-        batchId,
+        batchId: batchId === 'personal' ? null : batchId,
         title: `Assignment: ${title}`,
         category: 'assignment',
         date: new Date(deadline),

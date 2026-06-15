@@ -23,19 +23,21 @@ router.use(verifyFirebaseToken);
  */
 async function gatherUserContext(user) {
   const now = new Date();
-  const in5Days = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
-  const in48Hours = new Date(now.getTime() + 48 * 60 * 60 * 1000);
   const endOfTomorrow = new Date(now);
   endOfTomorrow.setDate(endOfTomorrow.getDate() + 1);
   endOfTomorrow.setHours(23, 59, 59, 999);
+
+  const memberships = await BatchMember.find({ userId: user._id }).lean();
+  const userBatches = memberships.map(m => m.batchId);
 
   // User profile
   const profile = user
     ? { name: user.name, branch: user.branch, cgpa: user.cgpa, semester: user.semester, backlogs: user.backlogs || 0 }
     : { name: 'Student', branch: '', cgpa: 0, semester: 0, backlogs: 0 };
 
-  // Pending assignments (not submitted, max 5)
+  // Pending assignments
   const assignments = await Assignment.find({
+    $or: [{ userId: user._id }, { batchId: { $in: userBatches } }],
     status: { $ne: 'Submitted' },
   })
     .sort({ deadline: 1 })
@@ -50,8 +52,9 @@ async function gatherUserContext(user) {
     priority: a.priorityLevel,
   }));
 
-  // Upcoming exams (within 14 days, max 5)
+  // Upcoming exams
   const exams = await Exam.find({
+    $or: [{ userId: user._id }, { batchId: { $in: userBatches } }],
     date: { $gte: now },
   })
     .sort({ date: 1 })
@@ -65,14 +68,17 @@ async function gatherUserContext(user) {
     venue: e.venue,
   }));
 
-  // Placements (active, eligible-ish, not applied, max 5)
+  // Placements
   const appliedStatuses = await StudentPlacementStatus.find({
     userId: user._id,
     status: 'Applied',
   }).lean();
   const appliedIds = new Set(appliedStatuses.map((s) => s.placementId.toString()));
 
-  const placements = await Placement.find({ status: 'active' })
+  const placements = await Placement.find({
+    $or: [{ batchId: null }, { batchId: { $in: userBatches } }],
+    status: 'active'
+  })
     .sort({ deadline: 1 })
     .limit(10)
     .lean();
@@ -88,11 +94,10 @@ async function gatherUserContext(user) {
       package: p.package,
     }));
 
-  // Today & tomorrow calendar events (max 5)
+  // Today & tomorrow calendar events
   const events = await CalendarEvent.find({
     userId: user._id,
     date: { $gte: now, $lte: endOfTomorrow },
-    status: 'upcoming',
   })
     .sort({ date: 1 })
     .limit(5)
@@ -105,8 +110,10 @@ async function gatherUserContext(user) {
     time: e.time,
   }));
 
-  // Recent batch posts/notices (3-5 most recent)
-  const recentPosts = await Post.find({})
+  // Recent batch posts/notices
+  const recentPosts = await Post.find({
+    $or: [{ uploadedBy: user._id, targetType: 'personal' }, { batchId: { $in: userBatches } }]
+  })
     .sort({ createdAt: -1 })
     .limit(5)
     .lean();
@@ -136,33 +143,41 @@ async function gatherDigestContext(user) {
   const in5Days = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
   const in48Hours = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 
+  const memberships = await BatchMember.find({ userId: user._id }).lean();
+  const userBatches = memberships.map(m => m.batchId);
+
   const name = user?.name || 'Student';
 
   const pendingAssignments = await Assignment.countDocuments({
+    $or: [{ userId: user._id }, { batchId: { $in: userBatches } }],
     status: { $ne: 'Submitted' },
   });
 
   const upcomingExams = await Exam.countDocuments({
+    $or: [{ userId: user._id }, { batchId: { $in: userBatches } }],
     date: { $gte: now, $lte: in5Days },
   });
 
   const urgentPlacements = await Placement.countDocuments({
+    $or: [{ batchId: null }, { batchId: { $in: userBatches } }],
     status: 'active',
     deadline: { $gte: now, $lte: in48Hours },
   });
 
   const urgentPosts = await Post.countDocuments({
+    $or: [{ uploadedBy: user._id, targetType: 'personal' }, { batchId: { $in: userBatches } }],
     priorityLevel: { $in: ['critical', 'urgent', 'high'] },
     createdAt: { $gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) },
   });
 
-  // Get a few specific items for digest content
   const nextAssignment = await Assignment.findOne({
+    $or: [{ userId: user._id }, { batchId: { $in: userBatches } }],
     status: { $ne: 'Submitted' },
     deadline: { $gte: now },
   }).sort({ deadline: 1 }).lean();
 
   const nextExam = await Exam.findOne({
+    $or: [{ userId: user._id }, { batchId: { $in: userBatches } }],
     date: { $gte: now },
   }).sort({ date: 1 }).lean();
 
@@ -171,11 +186,9 @@ async function gatherDigestContext(user) {
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const tomorrowStr = days[tomorrow.getDay()];
   
-  const memberships = await BatchMember.find({ userId: user._id }).lean();
   let tomorrowsClasses = [];
-  if (memberships.length > 0) {
-    const batchIds = memberships.map(m => m.batchId);
-    const timetables = await Timetable.find({ batchId: { $in: batchIds }, dayOfWeek: tomorrowStr }).lean();
+  if (userBatches.length > 0) {
+    const timetables = await Timetable.find({ batchId: { $in: userBatches }, dayOfWeek: tomorrowStr }).lean();
     tomorrowsClasses = timetables.flatMap(t => t.slots.map(s => `${s.time}: ${s.courseName || s.courseCode}`));
   }
 

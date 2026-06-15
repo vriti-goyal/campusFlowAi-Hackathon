@@ -131,13 +131,21 @@ function regexFallbackExtraction(text) {
  * Simple duplicate check: compare lowercase trimmed titles within same batch + category.
  * Returns existing Post if duplicate found, null otherwise.
  */
-async function checkDuplicate(batchId, category, title) {
+async function checkDuplicate(batchId, uploadedBy, category, title) {
   if (!title) return null;
 
   const normalizedTitle = title.toLowerCase().trim();
 
   // Look for posts in same batch with same category
-  const candidates = await Post.find({ batchId, category }).select('title').lean();
+  const query = { category };
+  if (batchId) {
+    query.batchId = batchId;
+  } else {
+    query.batchId = null;
+    query.uploadedBy = uploadedBy;
+  }
+
+  const candidates = await Post.find(query).select('title').lean();
 
   for (const post of candidates) {
     const existingTitle = (post.title || '').toLowerCase().trim();
@@ -238,7 +246,7 @@ export async function processUpload(fileUrl, batchId, uploadedBy, rawText = null
   extraction.extractedType = extraction.category;
 
   // Step 5: Duplicate check
-  const duplicate = await checkDuplicate(batchId, extraction.category, extraction.title);
+  const duplicate = await checkDuplicate(batchId, uploadedBy, extraction.category, extraction.title);
   if (duplicate) {
     console.log('[AI Pipeline] Duplicate detected, postId:', duplicate._id);
     extraction.isDuplicate = true;

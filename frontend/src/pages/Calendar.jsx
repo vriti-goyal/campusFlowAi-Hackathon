@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { CalendarDays, Plus, Trash2, ExternalLink, Calendar as CalendarIcon, Clock, Type } from 'lucide-react';
+import { CalendarDays, Plus, Trash2, ExternalLink, Calendar as CalendarIcon, Clock, Type, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '@/lib/api';
-import { CFButton, CFCard, CFBadge, CFInput, CFSkeleton, CFEmptyState } from '@/components/ui';
+import { CFButton, CFCard, CFBadge, CFSkeleton, CFEmptyState } from '@/components/ui';
 import { cn } from '@/lib/utils';
 
 const CATEGORIES = ['Assignment', 'Exam', 'Placement', 'Event', 'Hostel', 'Transport', 'Personal'];
@@ -26,6 +26,10 @@ export default function CalendarPage() {
   const [adding, setAdding] = useState(false);
   
   const [newEvent, setNewEvent] = useState({ title: '', date: '', time: '', category: 'Personal' });
+  
+  // Month Calendar State
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedDateFilter, setSelectedDateFilter] = useState(null);
 
   const fetchEvents = async () => {
     try {
@@ -78,31 +82,137 @@ export default function CalendarPage() {
           <CFSkeleton lines={1} className="w-1/3 h-8" />
           <CFSkeleton card lines={2} className="h-20" />
           <CFSkeleton card lines={2} className="h-20" />
-          <CFSkeleton card lines={2} className="h-20" />
         </div>
       </div>
     );
   }
 
-  // Group events by date
+  // Group events by date string (YYYY-MM-DD)
   const groupedEvents = events.reduce((acc, event) => {
-    if (!acc[event.date]) acc[event.date] = [];
-    acc[event.date].push(event);
+    const eventDateStr = event.date.split('T')[0]; 
+    if (!acc[eventDateStr]) acc[eventDateStr] = [];
+    acc[eventDateStr].push(event);
     return acc;
   }, {});
 
-  const sortedDates = Object.keys(groupedEvents).sort((a, b) => new Date(a) - new Date(b));
+  // For agenda view
+  let filteredSortedDates = Object.keys(groupedEvents).sort((a, b) => new Date(a) - new Date(b));
+  
+  if (selectedDateFilter) {
+    const pad = n => n.toString().padStart(2, '0');
+    const filterStr = `${selectedDateFilter.getFullYear()}-${pad(selectedDateFilter.getMonth()+1)}-${pad(selectedDateFilter.getDate())}`;
+    // if selected date has events, show only them, otherwise show empty
+    filteredSortedDates = groupedEvents[filterStr] ? [filterStr] : [];
+  }
+
+  // Month Calendar logic
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayOfMonth = new Date(year, month, 1).getDay(); // 0 = Sunday
+  
+  const blanks = Array.from({ length: firstDayOfMonth }, (_, i) => i);
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  const prevMonth = () => setCurrentMonth(new Date(year, month - 1, 1));
+  const nextMonth = () => setCurrentMonth(new Date(year, month + 1, 1));
+
+  // Determine if a calendar day has events
+  const hasEventsOnDate = (day) => {
+    const pad = n => n.toString().padStart(2, '0');
+    const localDateStr = `${year}-${pad(month+1)}-${pad(day)}`;
+    return groupedEvents[localDateStr]?.length > 0;
+  };
+
+  const isTodayDate = (day) => {
+    const today = new Date();
+    return today.getDate() === day && today.getMonth() === month && today.getFullYear() === year;
+  };
+
+  const isSelectedDate = (day) => {
+    if (!selectedDateFilter) return false;
+    return selectedDateFilter.getDate() === day && selectedDateFilter.getMonth() === month && selectedDateFilter.getFullYear() === year;
+  };
+
+  const handleDayClick = (day) => {
+    const selected = new Date(year, month, day);
+    // toggle off if already selected
+    if (selectedDateFilter && selected.getTime() === selectedDateFilter.getTime()) {
+      setSelectedDateFilter(null);
+    } else {
+      setSelectedDateFilter(selected);
+    }
+  };
 
   return (
     <div className="max-w-6xl pb-10">
-      <div className="flex items-center gap-3 mb-8">
-        <CalendarDays className="text-[#6A68DF]" size={28} />
-        <h2 className="text-2xl font-bold text-[var(--text-primary)]">Calendar & Agenda</h2>
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-3">
+          <CalendarDays className="text-[#6A68DF]" size={28} />
+          <h2 className="text-2xl font-bold text-[var(--text-primary)]">Calendar & Agenda</h2>
+        </div>
+        
+        {selectedDateFilter && (
+          <CFButton variant="ghost" size="sm" onClick={() => setSelectedDateFilter(null)} icon={X}>
+            Clear Date Filter
+          </CFButton>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-        {/* Left Column: Add Event */}
-        <div className="lg:col-span-1 lg:sticky lg:top-24 space-y-4">
+        {/* Left Column: Month Calendar + Add Event */}
+        <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-24">
+          
+          {/* Month Calendar Card */}
+          <CFCard className="p-5 ring-1 ring-[#6A68DF]/10 shadow-lg shadow-[#6A68DF]/5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-[var(--text-primary)] text-lg">
+                {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </h3>
+              <div className="flex gap-1">
+                <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-[var(--border)] text-[var(--text-secondary)] transition-colors"><ChevronLeft size={18}/></button>
+                <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-[var(--border)] text-[var(--text-secondary)] transition-colors"><ChevronRight size={18}/></button>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-7 gap-1 text-center mb-2">
+              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
+                <div key={d} className="text-[10px] font-bold text-[var(--text-muted)] uppercase">{d}</div>
+              ))}
+            </div>
+            
+            <div className="grid grid-cols-7 gap-1 text-center">
+              {blanks.map(b => <div key={`blank-${b}`} className="h-8"></div>)}
+              {days.map(day => {
+                const today = isTodayDate(day);
+                const selected = isSelectedDate(day);
+                const hasEvents = hasEventsOnDate(day);
+                
+                return (
+                  <button 
+                    key={day} 
+                    onClick={() => handleDayClick(day)}
+                    className={cn(
+                      "h-8 w-8 mx-auto rounded-full flex flex-col items-center justify-center text-sm relative transition-all duration-200",
+                      selected ? "bg-[#6A68DF] text-white shadow-md shadow-[#6A68DF]/30 font-bold" 
+                        : today ? "bg-[#6A68DF]/10 text-[#6A68DF] font-bold" 
+                        : "text-[var(--text-primary)] hover:bg-[var(--border)]",
+                    )}
+                  >
+                    <span>{day}</span>
+                    {hasEvents && !selected && (
+                      <span className="absolute bottom-1 w-1 h-1 rounded-full bg-[#EFB995]"></span>
+                    )}
+                    {hasEvents && selected && (
+                      <span className="absolute bottom-1 w-1 h-1 rounded-full bg-white/80"></span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </CFCard>
+
+          {/* Add Event Form */}
           <CFCard className="p-5">
             <h3 className="text-lg font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
               <Plus size={20} className="text-[#6A68DF]" /> Add New Event
@@ -176,26 +286,18 @@ export default function CalendarPage() {
             </form>
           </CFCard>
           
-          <CFCard className="bg-gradient-to-br from-[#6A68DF]/10 to-[#EFB995]/10 border-[#6A68DF]/20">
-            <h4 className="font-bold text-[var(--text-primary)] mb-2 flex items-center gap-2">
-              <CalendarIcon size={18} className="text-[#6A68DF]" /> Pro Tip
-            </h4>
-            <p className="text-sm text-[var(--text-secondary)]">
-              Your assignments and exams are automatically synced to this calendar. You only need to add personal events manually.
-            </p>
-          </CFCard>
         </div>
 
         {/* Right Column: Agenda */}
         <div className="lg:col-span-2 space-y-8">
-          {sortedDates.length === 0 ? (
+          {filteredSortedDates.length === 0 ? (
             <CFEmptyState 
               icon={CalendarIcon}
-              title="No upcoming events"
-              description="Your calendar is completely clear! Add an event to get started."
+              title={selectedDateFilter ? "No events on this day" : "No upcoming events"}
+              description={selectedDateFilter ? "You have a free day! Enjoy your time off." : "Your calendar is completely clear! Add an event to get started."}
             />
           ) : (
-            sortedDates.map(date => {
+            filteredSortedDates.map(date => {
               const dateObj = new Date(date);
               const isToday = new Date().toDateString() === dateObj.toDateString();
               
@@ -214,7 +316,7 @@ export default function CalendarPage() {
                   
                   <div className="space-y-3">
                     {groupedEvents[date].map(event => (
-                      <CFCard key={event._id} className="flex items-center justify-between p-4 group">
+                      <CFCard key={event._id} className="flex items-center justify-between p-4 group hover:ring-1 hover:ring-[#6A68DF]/30 transition-all">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 flex-1">
                           <span className="text-sm font-semibold w-20 shrink-0 flex items-center gap-1.5 text-[var(--text-primary)]">
                             <Clock size={14} className="text-[#6A68DF]" />

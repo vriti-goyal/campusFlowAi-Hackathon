@@ -245,18 +245,7 @@ export default function ProfilePage() {
             </div>
           </CFCard>
 
-          {/* Routine */}
-          {(profile?.routine?.wakeUpTime || profile?.routine?.sleepTime) && (
-            <CFCard className="p-6 sm:p-8">
-              <h3 className="text-sm font-bold text-[#6A68DF] uppercase tracking-wider mb-6 flex items-center gap-2">
-                <Clock size={18} /> Daily Routine
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12">
-                <InfoField icon={Clock} label="Wake Up Time" value={profile?.routine?.wakeUpTime} />
-                <InfoField icon={Moon} label="Sleep Time" value={profile?.routine?.sleepTime} />
-              </div>
-            </CFCard>
-          )}
+
         </div>
       ) : (
         /* ── EDIT MODE ── */
@@ -297,13 +286,7 @@ export default function ProfilePage() {
             </div>
           </CFCard>
 
-          <CFCard className="p-6 sm:p-8 border-[#6A68DF]/30 ring-1 ring-[#6A68DF]/10 shadow-lg shadow-[#6A68DF]/5">
-            <h3 className="text-sm font-bold text-[var(--text-primary)] mb-6">Daily Routine</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <EditField label="Wake Up Time" name="routine.wakeUpTime" type="time" value={editProfile?.routine?.wakeUpTime || ''} onChange={handleChange} />
-              <EditField label="Sleep Time" name="routine.sleepTime" type="time" value={editProfile?.routine?.sleepTime || ''} onChange={handleChange} />
-            </div>
-          </CFCard>
+
 
           {/* Save / Cancel at bottom too */}
           <div className="flex justify-end gap-3 sticky bottom-4 bg-[var(--bg)]/90 backdrop-blur-md p-4 rounded-2xl border border-[var(--border)] shadow-lg z-10">

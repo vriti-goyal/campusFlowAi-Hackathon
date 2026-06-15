@@ -94,6 +94,7 @@ async function handleAssignment({ text, userId, batchId, fileUrl, targetType, ta
 
   // Create Assignment
   const assignment = await Assignment.create({
+    userId,
     batchId,
     postId: post._id,
     title: extracted.title,

@@ -15,20 +15,23 @@ export default function AssignmentsPage() {
       const batchRes = await api.get('/api/batch/my-batches').catch(() => ({ data: [] }));
       const batches = batchRes.data || [];
 
-      if (batches.length === 0) {
-        const res = await api.get('/api/assignments');
-        setAssignments(res.data.data || []);
-      } else {
-        const allAssignments = [];
-        const seenIds = new Set();
-        for (const b of batches) {
-          const res = await api.get('/api/assignments', { params: { batchId: b._id } });
-          for (const a of (res.data.data || [])) {
-            if (!seenIds.has(a._id)) { seenIds.add(a._id); allAssignments.push(a); }
-          }
-        }
-        setAssignments(allAssignments);
+      const allAssignments = [];
+      const seenIds = new Set();
+
+      // Fetch personal assignments
+      const personalRes = await api.get('/api/assignments').catch(() => ({ data: { data: [] } }));
+      for (const a of (personalRes.data?.data || [])) {
+        if (!seenIds.has(a._id)) { seenIds.add(a._id); allAssignments.push(a); }
       }
+
+      // Fetch batch assignments
+      for (const b of batches) {
+        const res = await api.get('/api/assignments', { params: { batchId: b._id } }).catch(() => ({ data: { data: [] } }));
+        for (const a of (res.data?.data || [])) {
+          if (!seenIds.has(a._id)) { seenIds.add(a._id); allAssignments.push(a); }
+        }
+      }
+      setAssignments(allAssignments);
     } catch {
       // Silently handle
     } finally {
