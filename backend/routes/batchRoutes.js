@@ -293,4 +293,32 @@ router.delete('/:batchId', async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/batch/:batchId/leave
+ * Allows a member or moderator to leave a batch.
+ * The owner cannot leave a batch (they must delete it or transfer ownership).
+ */
+router.delete('/:batchId/leave', async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    
+    const membership = await BatchMember.findOne({ batchId, userId: req.user._id });
+    if (!membership) {
+      return res.status(404).json({ error: 'You are not a member of this batch' });
+    }
+
+    if (membership.role === 'owner') {
+      return res.status(403).json({ error: 'The owner cannot leave the batch. You must delete it instead.' });
+    }
+
+    await BatchMember.deleteOne({ _id: membership._id });
+    
+    console.log(`[Batch] User ${req.user._id} left batch ${batchId}`);
+    res.json({ message: 'Successfully left the batch' });
+  } catch (error) {
+    console.error('[Batch Leave] Error:', error);
+    res.status(500).json({ error: 'Failed to leave batch' });
+  }
+});
+
 export default router;

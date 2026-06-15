@@ -1,8 +1,77 @@
 import React, { useState, useEffect } from 'react';
-import { Layers, Plus, UserPlus, Loader2, Copy, Trash2, AlertTriangle, X, BookOpen, ChevronRight, Hash, Edit3 } from 'lucide-react';
+import { Layers, Plus, UserPlus, Loader2, Copy, Trash2, AlertTriangle, X, BookOpen, ChevronRight, Hash, Edit3, LogOut } from 'lucide-react';
 import api from '@/lib/api';
 import { CFButton, CFCard, CFBadge, CFInput, CFSkeleton, CFEmptyState } from '@/components/ui';
 import { cn } from '@/lib/utils';
+
+// ── Leave Confirmation Modal ──────────────────────────────────────────────────
+function LeaveBatchModal({ batch, onClose, onLeft }) {
+  const [leaving, setLeaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleLeave = async () => {
+    setLeaving(true);
+    try {
+      await api.delete(`/api/batch/${batch._id}/leave`);
+      onLeft(batch._id);
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to leave batch. Please try again.');
+    } finally {
+      setLeaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <CFCard className="max-w-md w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3 text-orange-500">
+            <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+              <LogOut size={20} className="text-orange-600" />
+            </div>
+            <h3 className="font-bold text-xl text-[var(--text-primary)]">Leave Batch</h3>
+          </div>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-900 rounded-xl p-4">
+          <p className="text-sm text-orange-700 dark:text-orange-400 font-medium">
+            Are you sure you want to leave <strong className="font-bold">{batch.batchName}</strong>?
+          </p>
+          <p className="text-xs text-orange-600/80 dark:text-orange-400/80 mt-1.5 font-medium">
+            You will no longer have access to this batch's feed, assignments, and exams unless you rejoin using the invite code.
+          </p>
+        </div>
+
+        {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
+
+        <div className="flex gap-3 pt-2">
+          <CFButton
+            variant="secondary"
+            onClick={onClose}
+            className="flex-1 py-2.5"
+          >
+            Cancel
+          </CFButton>
+          <CFButton
+            variant="primary"
+            onClick={handleLeave}
+            disabled={leaving}
+            loading={leaving}
+            icon={LogOut}
+            className="flex-1 py-2.5 bg-orange-500 hover:bg-orange-600 border-none text-white"
+          >
+            Leave Batch
+          </CFButton>
+        </div>
+      </CFCard>
+    </div>
+  );
+}
+
 
 // ── Edit Batch Modal ──────────────────────────────────────────────────────────
 function EditBatchModal({ batch, onClose, onEdited }) {
@@ -228,6 +297,7 @@ export default function BatchPage() {
   const [joining, setJoining] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
+  const [leaveTarget, setLeaveTarget] = useState(null);
 
   const [createForm, setCreateForm] = useState({ batchName: '', college: '', branch: '', semester: '' });
   const [courseRows, setCourseRows] = useState([{ code: '', name: '', faculty: '' }]);
@@ -322,6 +392,15 @@ export default function BatchPage() {
           batch={editTarget}
           onClose={() => setEditTarget(null)}
           onEdited={handleEdited}
+        />
+      )}
+
+      {/* Leave modal */}
+      {leaveTarget && (
+        <LeaveBatchModal
+          batch={leaveTarget}
+          onClose={() => setLeaveTarget(null)}
+          onLeft={handleDeleted} // we reuse handleDeleted since it filters out the batchId locally
         />
       )}
 
@@ -497,7 +576,32 @@ export default function BatchPage() {
                   </div>
                 )}
                 
-                {(batch.myRole === 'owner' || batch.myRole === 'moderator') && (
+                {batch.myRole !== 'owner' && (
+                  <div className="flex gap-2 mt-4 pt-4 border-t border-[var(--border)]">
+                    {batch.myRole === 'moderator' && (
+                      <CFButton
+                        variant="secondary"
+                        onClick={() => setEditTarget(batch)}
+                        className="flex-1 py-2 bg-transparent hover:bg-[#6A68DF]/5 border-[#6A68DF]/20 text-[#6A68DF]"
+                        icon={Edit3}
+                        size="sm"
+                      >
+                        Edit
+                      </CFButton>
+                    )}
+                    <CFButton
+                      variant="ghost"
+                      onClick={() => setLeaveTarget(batch)}
+                      className="flex-1 text-orange-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 py-2 border border-orange-100 dark:border-orange-900/30"
+                      icon={LogOut}
+                      size="sm"
+                    >
+                      Leave Batch
+                    </CFButton>
+                  </div>
+                )}
+                
+                {batch.myRole === 'owner' && (
                   <div className="flex gap-2 mt-4 pt-4 border-t border-[var(--border)]">
                     <CFButton
                       variant="secondary"
@@ -509,17 +613,15 @@ export default function BatchPage() {
                       Edit
                     </CFButton>
                     
-                    {batch.myRole === 'owner' && (
-                      <CFButton
-                        variant="ghost"
-                        onClick={() => setDeleteTarget(batch)}
-                        className="flex-1 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 py-2 border border-red-100 dark:border-red-900/30"
-                        icon={Trash2}
-                        size="sm"
-                      >
-                        Delete
-                      </CFButton>
-                    )}
+                    <CFButton
+                      variant="ghost"
+                      onClick={() => setDeleteTarget(batch)}
+                      className="flex-1 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 py-2 border border-red-100 dark:border-red-900/30"
+                      icon={Trash2}
+                      size="sm"
+                    >
+                      Delete
+                    </CFButton>
                   </div>
                 )}
               </CFCard>
