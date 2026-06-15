@@ -55,7 +55,7 @@ export default function AssignmentsPage() {
     }
   };
 
-  const tabs = ['Not Started', 'In Progress', 'Submitted', 'Missed'];
+  const tabs = ['Not Started', 'Submitted', 'Missed'];
   const filteredAssignments = assignments.filter((a) => a.status === activeTab);
 
   if (loading) {
@@ -172,24 +172,6 @@ export default function AssignmentsPage() {
                   </div>
 
                   <div className="flex flex-wrap gap-2 pt-2 border-t border-[var(--border)]">
-                    {a.status === 'Not Started' && (
-                      <CFButton
-                        onClick={() => updateStatus(a._id, 'In Progress')}
-                        loading={updating === a._id}
-                        icon={Play} size="sm" variant="primary" className="flex-1 text-xs py-1.5"
-                      >
-                        Start
-                      </CFButton>
-                    )}
-                    {(a.status === 'Not Started' || a.status === 'In Progress') && (
-                      <CFButton
-                        onClick={() => updateStatus(a._id, 'Submitted')}
-                        loading={updating === a._id}
-                        icon={CheckCircle2} size="sm" variant="secondary" className="flex-1 text-xs py-1.5 hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-900/20"
-                      >
-                        Submit
-                      </CFButton>
-                    )}
                     {a.status !== 'Submitted' && (
                       <CFButton
                         onClick={() => alert('Reminder set! (stub)')}

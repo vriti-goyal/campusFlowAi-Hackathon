@@ -96,7 +96,7 @@ async function gatherUserContext(user) {
 
   // Today & tomorrow calendar events
   const events = await CalendarEvent.find({
-    userId: user._id,
+    $or: [{ userId: user._id }, { batchId: { $in: userBatches } }],
     date: { $gte: now, $lte: endOfTomorrow },
   })
     .sort({ date: 1 })
